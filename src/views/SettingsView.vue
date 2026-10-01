@@ -257,7 +257,7 @@ function freqLabel(freq: number) {
       <div class="group-title dim">{{ t("settings.about") }}</div>
       <div class="row">
         <span>{{ t("settings.aboutDesc") }}</span>
-        <span class="dim">v0.6.0</span>
+        <span class="dim">v0.6.1</span>
       </div>
     </div>
   </section>

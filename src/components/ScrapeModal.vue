@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { onMounted, ref } from "vue";
-import { Check, Globe, ImageDown, X } from "lucide-vue-next";
-import { scrapeApi, type AlbumCandidate } from "../services/scrape";
+import { Check, Globe, ImageDown, Search, X } from "lucide-vue-next";
+import { scrapeApi, type AlbumCandidate, type ScrapeSource } from "../services/scrape";
 import { t } from "../i18n";
 
 /**
- * 在线刮削候选选择（M4）：iTunes（JP 店面优先，J-Pop 主要来源）。
+ * 在线刮削候选选择（M4 + 多站点增强）：iTunes（JP 店面优先，J-Pop 主要来源）、
+ * Deezer、MusicBrainz（仅专辑模式）；来源可筛选，检索词可自定义改写。
  * album 模式应用封面 + 年份/流派到专辑及曲目；track 模式仅应用该曲目封面。
  */
 const props = defineProps<{
@@ -13,6 +14,8 @@ const props = defineProps<{
   targetId: number;
   /** 展示用检索对象名（专辑名或曲名） */
   name: string;
+  /** 展示用艺人（预填自定义检索词） */
+  artist?: string | null;
 }>();
 const emit = defineEmits<{ close: []; applied: [candidate: AlbumCandidate] }>();
 
@@ -22,17 +25,39 @@ const candidates = ref<AlbumCandidate[]>([]);
 const appliedProvider = ref<string | null>(null);
 const applying = ref<string | null>(null);
 
-onMounted(async () => {
+/** 来源筛选：null = 全部站点合并；MusicBrainz 仅专辑模式有封面数据 */
+const source = ref<ScrapeSource | null>(null);
+/** 自定义检索词（空 = 按标签元数据检索） */
+const term = ref("");
+const searchBox = ref<HTMLInputElement | null>(null);
+
+const SOURCE_OPTIONS: { value: ScrapeSource | null; key: string; albumOnly?: boolean }[] = [
+  { value: null, key: "scrape.sourceAll" },
+  { value: "itunes", key: "scrape.sourceItunes" },
+  { value: "deezer", key: "scrape.sourceDeezer" },
+  { value: "musicBrainz", key: "scrape.sourceMusicbrainz", albumOnly: true },
+];
+
+async function load() {
+  loading.value = true;
+  error.value = "";
   try {
+    const q = term.value.trim() || null;
     candidates.value = props.mode === "album"
-      ? await scrapeApi.album(props.targetId)
-      : await scrapeApi.track(props.targetId);
+      ? await scrapeApi.album(props.targetId, source.value, q)
+      : await scrapeApi.track(props.targetId, source.value, q);
     if (!candidates.value.length) error.value = t("scrape.noResult");
   } catch (e) {
     error.value = String(e instanceof Error ? e.message : e);
   } finally {
     loading.value = false;
   }
+}
+
+onMounted(async () => {
+  term.value = [props.name, props.artist].filter(Boolean).join(" ").trim();
+  await load();
+  searchBox.value?.focus();
 });
 
 async function apply(candidate: AlbumCandidate) {
@@ -54,6 +79,8 @@ async function apply(candidate: AlbumCandidate) {
 }
 
 function providerLabel(provider: string) {
+  if (provider === "deezer") return "Deezer";
+  if (provider === "musicbrainz") return "MusicBrainz";
   const store = provider.split("-")[1]?.toUpperCase();
   return store ? `iTunes (${store})` : provider;
 }
@@ -72,6 +99,33 @@ function providerLabel(provider: string) {
           <X :size="14" />
         </button>
       </header>
+
+      <!-- 多站点来源筛选 + 自定义检索词 -->
+      <div class="m-tools">
+        <div class="segment">
+          <button
+            v-for="opt in SOURCE_OPTIONS.filter((o) => mode === 'album' || !o.albumOnly)"
+            :key="opt.key"
+            :class="{ active: source === opt.value }"
+            @click="source = opt.value; void load()"
+          >
+            {{ t(opt.key) }}
+          </button>
+        </div>
+        <div class="search-row">
+          <input
+            ref="searchBox"
+            v-model="term"
+            :placeholder="t('scrape.termPlaceholder')"
+            spellcheck="false"
+            @keydown.enter="void load()"
+          />
+          <button class="go" :title="t('scrape.search')" @click="void load()">
+            <Search :size="13" />
+            {{ t("scrape.search") }}
+          </button>
+        </div>
+      </div>
 
       <div class="m-body">
         <div v-if="loading" class="m-empty dim">{{ t("scrape.searching") }}</div>
@@ -181,6 +235,84 @@ function providerLabel(provider: string) {
 .m-close:hover {
   background: var(--bg-hover);
   color: var(--text);
+}
+
+/* 多站点工具区：来源分段选择 + 自定义检索词 */
+.m-tools {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px 0;
+}
+
+.segment {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  align-self: flex-start;
+}
+
+.segment button {
+  padding: 5px 12px;
+  border: none;
+  background: var(--bg-elev);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.segment button + button {
+  border-left: 1px solid var(--border);
+}
+
+.segment button.active {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.search-row {
+  display: flex;
+  gap: 8px;
+}
+
+.search-row input {
+  flex: 1;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 13px;
+  outline: none;
+  min-width: 0;
+}
+
+.search-row input:focus {
+  border-color: var(--accent);
+}
+
+.search-row .go {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-elev);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.search-row .go svg {
+  display: block;
+}
+
+.search-row .go:hover {
+  border-color: var(--accent);
+  color: var(--accent);
 }
 
 .m-body {

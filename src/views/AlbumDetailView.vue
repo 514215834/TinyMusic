@@ -63,6 +63,7 @@ watch(
         mode="album"
         :target-id="album.id"
         :name="album.name"
+        :artist="album.artist"
         @close="scraping = false"
         @applied="() => void load(album!.id)"
       />

@@ -164,6 +164,7 @@ function seekToWord(word: LrcWord) {
         v-if="lyricsScraping && player.currentTrack"
         :track-id="player.currentTrack.id"
         :name="player.currentTrack.title"
+        :artist="player.currentTrack.artist"
         @close="lyricsScraping = false"
         @applied="() => void loadLyrics()"
       />

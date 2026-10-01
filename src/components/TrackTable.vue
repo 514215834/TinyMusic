@@ -211,6 +211,7 @@ function onTagSaved(updated: Track) {
         mode="track"
         :target-id="scrapingTrack.id"
         :name="scrapingTrack.title"
+        :artist="scrapingTrack.artist"
         @close="scrapingTrack = null"
         @applied="onScrapeApplied"
       />

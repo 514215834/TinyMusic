@@ -9,14 +9,24 @@ use tauri::State;
 
 use crate::error::{AppError, AppErrorDto, AppResult};
 use crate::library::{covers, scrape};
-use crate::models::{AlbumCandidate, LyricsCandidate};
+use crate::models::{AlbumCandidate, LyricsCandidate, ScrapeSource};
 use crate::AppState;
+
+/// 检索词：自定义 query 优先（用户在刮削弹窗可改写检索信息），空则回落到标签元数据
+fn effective_term(query: Option<&str>, fallback: String) -> String {
+    match query.map(str::trim).filter(|s| !s.is_empty()) {
+        Some(q) => q.to_string(),
+        None => fallback,
+    }
+}
 
 #[tauri::command]
 #[specta::specta]
 pub async fn scrape_album(
     state: State<'_, AppState>,
     album_id: i32,
+    source: Option<ScrapeSource>,
+    query: Option<String>,
 ) -> Result<Vec<AlbumCandidate>, AppErrorDto> {
     let (name, artist): (String, String) = {
         let conn = state.conn.lock();
@@ -27,11 +37,16 @@ pub async fn scrape_album(
         )
         .map_err(AppError::from)?
     };
-    let term = format!("{} {}", name.trim(), artist.trim()).trim().to_string();
+    let term = effective_term(
+        query.as_deref(),
+        format!("{} {}", name.trim(), artist.trim()).trim().to_string(),
+    );
     if term.is_empty() {
-        return Err(AppError::Message("专辑名为空，无法检索".into()).into());
+        return Err(AppError::Message("检索词为空，无法刮削".into()).into());
     }
-    scrape::search_itunes(&term, "album", 12).await.map_err(AppErrorDto::from)
+    scrape::search_candidates(&term, "album", source)
+        .await
+        .map_err(AppErrorDto::from)
 }
 
 #[tauri::command]
@@ -39,6 +54,8 @@ pub async fn scrape_album(
 pub async fn scrape_track(
     state: State<'_, AppState>,
     track_id: i32,
+    source: Option<ScrapeSource>,
+    query: Option<String>,
 ) -> Result<Vec<AlbumCandidate>, AppErrorDto> {
     let (title, artist): (String, Option<String>) = {
         let conn = state.conn.lock();
@@ -50,13 +67,18 @@ pub async fn scrape_track(
         )
         .map_err(AppError::from)?
     };
-    let term = format!("{} {}", title.trim(), artist.as_deref().unwrap_or("").trim())
-        .trim()
-        .to_string();
+    let term = effective_term(
+        query.as_deref(),
+        format!("{} {}", title.trim(), artist.as_deref().unwrap_or("").trim())
+            .trim()
+            .to_string(),
+    );
     if term.is_empty() {
-        return Err(AppError::Message("曲名为空，无法检索".into()).into());
+        return Err(AppError::Message("检索词为空，无法刮削".into()).into());
     }
-    scrape::search_itunes(&term, "song", 12).await.map_err(AppErrorDto::from)
+    scrape::search_candidates(&term, "song", source)
+        .await
+        .map_err(AppErrorDto::from)
 }
 
 /// 下载封面入 covers/ 缓存，返回缓存文件名
@@ -137,6 +159,7 @@ pub async fn scrape_apply_track(
 pub async fn scrape_lyrics(
     state: State<'_, AppState>,
     track_id: i32,
+    query: Option<String>,
 ) -> Result<Vec<LyricsCandidate>, AppErrorDto> {
     let (title, artist, album, duration): (String, Option<String>, Option<String>, Option<f64>) = {
         let conn = state.conn.lock();
@@ -149,6 +172,12 @@ pub async fn scrape_lyrics(
         )
         .map_err(AppError::from)?
     };
+    // 自定义检索词走 LRCLIB q 模糊检索；否则按 标签 精确字段检索
+    if let Some(q) = query.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
+        return scrape::search_lyrics_q(q, duration)
+            .await
+            .map_err(AppErrorDto::from);
+    }
     scrape::search_lyrics(
         title.trim(),
         artist.as_deref().unwrap_or("").trim(),

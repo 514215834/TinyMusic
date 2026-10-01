@@ -170,6 +170,18 @@ pub struct TagPatch {
     pub track_no: Option<i32>,
 }
 
+/// 刮削来源站点（免鉴权主流源）；None = 全部站点合并检索
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub enum ScrapeSource {
+    /// iTunes Search（JP 店面优先，US 兜底）：封面/专辑信息
+    Itunes,
+    /// Deezer API：封面/专辑信息
+    Deezer,
+    /// MusicBrainz + Cover Art Archive：专辑信息/封面（仅专辑模式，1 req/s 限速）
+    MusicBrainz,
+}
+
 /// iTunes 刮削候选（专辑/单曲封面与专辑信息，iTunes Search API）
 #[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]

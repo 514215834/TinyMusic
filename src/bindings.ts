@@ -41,15 +41,27 @@ export const commands = {
 	playlistRename: (id: number, name: string) => typedError<null, AppErrorDto>(__TAURI_INVOKE("playlist_rename", { id, name })),
 	playlistReorder: (id: number, trackIds: number[]) => typedError<number, AppErrorDto>(__TAURI_INVOKE("playlist_reorder", { id, trackIds })),
 	playlistTracks: (id: number) => typedError<Track[], AppErrorDto>(__TAURI_INVOKE("playlist_tracks", { id })),
-	scrapeAlbum: (albumId: number) => typedError<AlbumCandidate[], AppErrorDto>(__TAURI_INVOKE("scrape_album", { albumId })),
+	scrapeAlbum: (albumId: number, source: 
+/**  iTunes Search（JP 店面优先，US 兜底）：封面/专辑信息 */
+"itunes" | 
+/**  Deezer API：封面/专辑信息 */
+"deezer" | 
+/**  MusicBrainz + Cover Art Archive：专辑信息/封面（仅专辑模式，1 req/s 限速） */
+"musicBrainz" | null, query: string | null) => typedError<AlbumCandidate[], AppErrorDto>(__TAURI_INVOKE("scrape_album", { albumId, source, query })),
 	/**  应用专辑候选：封面入缓存 → albums.cover_file/year 更新 → 专辑内曲目的 year/genre 同步 */
 	scrapeApplyAlbum: (albumId: number, candidate: AlbumCandidate) => typedError<string | null, AppErrorDto>(__TAURI_INVOKE("scrape_apply_album", { albumId, candidate })),
 	/**  应用歌词候选：同步歌词优先；同名 .lrc 已存在时一并更新，保持两条通道一致 */
 	scrapeApplyLyrics: (trackId: number, candidate: LyricsCandidate) => typedError<null, AppErrorDto>(__TAURI_INVOKE("scrape_apply_lyrics", { trackId, candidate })),
 	/**  应用单曲候选：仅该曲目的封面（文本字段走标签编辑，职责分离） */
 	scrapeApplyTrack: (trackId: number, candidate: AlbumCandidate) => typedError<string, AppErrorDto>(__TAURI_INVOKE("scrape_apply_track", { trackId, candidate })),
-	scrapeLyrics: (trackId: number) => typedError<LyricsCandidate[], AppErrorDto>(__TAURI_INVOKE("scrape_lyrics", { trackId })),
-	scrapeTrack: (trackId: number) => typedError<AlbumCandidate[], AppErrorDto>(__TAURI_INVOKE("scrape_track", { trackId })),
+	scrapeLyrics: (trackId: number, query: string | null) => typedError<LyricsCandidate[], AppErrorDto>(__TAURI_INVOKE("scrape_lyrics", { trackId, query })),
+	scrapeTrack: (trackId: number, source: 
+/**  iTunes Search（JP 店面优先，US 兜底）：封面/专辑信息 */
+"itunes" | 
+/**  Deezer API：封面/专辑信息 */
+"deezer" | 
+/**  MusicBrainz + Cover Art Archive：专辑信息/封面（仅专辑模式，1 req/s 限速） */
+"musicBrainz" | null, query: string | null) => typedError<AlbumCandidate[], AppErrorDto>(__TAURI_INVOKE("scrape_track", { trackId, source, query })),
 	searchTracks: (q: string, page: number | null, pageSize: number | null) => typedError<TrackPage, AppErrorDto>(__TAURI_INVOKE("search_tracks", { q, page, pageSize })),
 	settingsGet: (key: string) => typedError<string | null, AppErrorDto>(__TAURI_INVOKE("settings_get", { key })),
 	settingsSet: (key: string, value: string) => typedError<null, AppErrorDto>(__TAURI_INVOKE("settings_set", { key, value })),
@@ -152,6 +164,15 @@ export type PlaylistImport = {
 	added: number,
 	skipped: number,
 };
+
+/**  刮削来源站点（免鉴权主流源）；None = 全部站点合并检索 */
+export type ScrapeSource = 
+/**  iTunes Search（JP 店面优先，US 兜底）：封面/专辑信息 */
+"itunes" | 
+/**  Deezer API：封面/专辑信息 */
+"deezer" | 
+/**  MusicBrainz + Cover Art Archive：专辑信息/封面（仅专辑模式，1 req/s 限速） */
+"musicBrainz";
 
 /**  智能歌单规则字段（功能设计文档 M4：五类规则） */
 export type SmartField = 

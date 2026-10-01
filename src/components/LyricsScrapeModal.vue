@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { onMounted, ref } from "vue";
-import { Check, Globe, X } from "lucide-vue-next";
+import { Check, Globe, Search, X } from "lucide-vue-next";
 import { scrapeApi, type LyricsCandidate } from "../services/scrape";
 import { formatTime } from "../utils";
 import { t } from "../i18n";
 
-const props = defineProps<{ trackId: number; name: string }>();
+const props = defineProps<{ trackId: number; name: string; artist?: string | null }>();
 const emit = defineEmits<{ close: []; applied: [candidate: LyricsCandidate] }>();
 
 const loading = ref(true);
@@ -13,16 +13,25 @@ const error = ref("");
 const candidates = ref<LyricsCandidate[]>([]);
 const appliedId = ref<number | null>(null);
 const applyingId = ref<number | null>(null);
+/** 自定义检索词（空 = 按标签元数据检索，走 LRCLIB q 模糊匹配） */
+const term = ref("");
 
-onMounted(async () => {
+async function load() {
+  loading.value = true;
+  error.value = "";
   try {
-    candidates.value = await scrapeApi.lyrics(props.trackId);
+    candidates.value = await scrapeApi.lyrics(props.trackId, term.value.trim() || null);
     if (!candidates.value.length) error.value = t("scrape.noResult");
   } catch (e) {
     error.value = String(e instanceof Error ? e.message : e);
   } finally {
     loading.value = false;
   }
+}
+
+onMounted(async () => {
+  term.value = [props.name, props.artist].filter(Boolean).join(" ").trim();
+  await load();
 });
 
 async function apply(candidate: LyricsCandidate) {
@@ -53,6 +62,22 @@ async function apply(candidate: LyricsCandidate) {
           <X :size="14" />
         </button>
       </header>
+
+      <!-- 自定义检索词 -->
+      <div class="m-tools">
+        <div class="search-row">
+          <input
+            v-model="term"
+            :placeholder="t('scrape.termPlaceholder')"
+            spellcheck="false"
+            @keydown.enter="void load()"
+          />
+          <button class="go" :title="t('scrape.search')" @click="void load()">
+            <Search :size="13" />
+            {{ t("scrape.search") }}
+          </button>
+        </div>
+      </div>
 
       <div class="m-body">
         <div v-if="loading" class="m-empty dim">{{ t("scrape.searching") }}</div>
@@ -159,6 +184,54 @@ async function apply(candidate: LyricsCandidate) {
 .m-close:hover {
   background: var(--bg-hover);
   color: var(--text);
+}
+
+.m-tools {
+  padding: 10px 12px 0;
+}
+
+.search-row {
+  display: flex;
+  gap: 8px;
+}
+
+.search-row input {
+  flex: 1;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 13px;
+  outline: none;
+  min-width: 0;
+}
+
+.search-row input:focus {
+  border-color: var(--accent);
+}
+
+.search-row .go {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-elev);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.search-row .go svg {
+  display: block;
+}
+
+.search-row .go:hover {
+  border-color: var(--accent);
+  color: var(--accent);
 }
 
 .m-body {
