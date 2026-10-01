@@ -4,138 +4,183 @@ import { invoke as __TAURI_INVOKE } from "@tauri-apps/api/core";
 
 /** Commands */
 export const commands = {
-	albumTracks: (albumId: number) => typedError<Track[], AppErrorDto>(__TAURI_INVOKE("album_tracks", { albumId })),
-	albumsQuery: () => typedError<AlbumInfo[], AppErrorDto>(__TAURI_INVOKE("albums_query")),
-	artistTracks: (artistId: number) => typedError<Track[], AppErrorDto>(__TAURI_INVOKE("artist_tracks", { artistId })),
-	artistsQuery: () => typedError<ArtistInfo[], AppErrorDto>(__TAURI_INVOKE("artists_query")),
-	coverPath: (file: string) => typedError<string | null, AppErrorDto>(__TAURI_INVOKE("cover_path", { file })),
-	favoriteToggle: (trackId: number) => typedError<boolean, AppErrorDto>(__TAURI_INVOKE("favorite_toggle", { trackId })),
-	/**  收藏 id 集合（前端行内红心状态用，避免逐行查询） */
-	favoritesIds: () => typedError<number[], AppErrorDto>(__TAURI_INVOKE("favorites_ids")),
-	favoritesList: () => typedError<Track[], AppErrorDto>(__TAURI_INVOKE("favorites_list")),
-	folderAdd: (path: string) => typedError<Folder, AppErrorDto>(__TAURI_INVOKE("folder_add", { path })),
-	folderList: () => typedError<Folder[], AppErrorDto>(__TAURI_INVOKE("folder_list")),
-	folderRemove: (id: number) => typedError<boolean, AppErrorDto>(__TAURI_INVOKE("folder_remove", { id })),
-	historyAdd: (trackId: number) => typedError<null, AppErrorDto>(__TAURI_INVOKE("history_add", { trackId })),
-	libraryRescan: () => typedError<null, AppErrorDto>(__TAURI_INVOKE("library_rescan")),
-	lyricsGet: (trackId: number) => typedError<string | null, AppErrorDto>(__TAURI_INVOKE("lyrics_get", { trackId })),
-	overlayHide: () => typedError<null, AppErrorDto>(__TAURI_INVOKE("overlay_hide")),
-	/**  锁定⇄调整态（锁定 = 鼠标完全穿透） */
-	overlaySetLocked: (locked: boolean) => typedError<null, AppErrorDto>(__TAURI_INVOKE("overlay_set_locked", { locked })),
-	/**  透明度调节 0.3–0.9，即时生效并持久化 */
-	overlaySetOpacity: (opacity: number | null) => typedError<null, AppErrorDto>(__TAURI_INVOKE("overlay_set_opacity", { opacity })),
-	/**  配置调整/锁定切换的全局快捷键（设置页调用，即时生效并持久化） */
-	overlaySetShortcut: (shortcut: string) => typedError<null, AppErrorDto>(__TAURI_INVOKE("overlay_set_shortcut", { shortcut })),
-	/**  显示/隐藏迷你悬浮窗（托盘与主窗口播放条共用入口） */
-	overlayToggle: () => typedError<null, AppErrorDto>(__TAURI_INVOKE("overlay_toggle")),
-	playlistAddTracks: (id: number, trackIds: number[]) => typedError<number, AppErrorDto>(__TAURI_INVOKE("playlist_add_tracks", { id, trackIds })),
-	playlistCreate: (name: string) => typedError<Playlist, AppErrorDto>(__TAURI_INVOKE("playlist_create", { name })),
-	playlistDelete: (id: number) => typedError<null, AppErrorDto>(__TAURI_INVOKE("playlist_delete", { id })),
-	playlistList: () => typedError<Playlist[], AppErrorDto>(__TAURI_INVOKE("playlist_list")),
-	playlistRemoveTrack: (id: number, trackId: number) => typedError<number, AppErrorDto>(__TAURI_INVOKE("playlist_remove_track", { id, trackId })),
-	playlistRename: (id: number, name: string) => typedError<null, AppErrorDto>(__TAURI_INVOKE("playlist_rename", { id, name })),
-	playlistReorder: (id: number, trackIds: number[]) => typedError<number, AppErrorDto>(__TAURI_INVOKE("playlist_reorder", { id, trackIds })),
-	playlistTracks: (id: number) => typedError<Track[], AppErrorDto>(__TAURI_INVOKE("playlist_tracks", { id })),
-	searchTracks: (q: string, page: number | null, pageSize: number | null) => typedError<TrackPage, AppErrorDto>(__TAURI_INVOKE("search_tracks", { q, page, pageSize })),
-	settingsGet: (key: string) => typedError<string | null, AppErrorDto>(__TAURI_INVOKE("settings_get", { key })),
-	settingsSet: (key: string, value: string) => typedError<null, AppErrorDto>(__TAURI_INVOKE("settings_set", { key, value })),
-	/**
-	 *  主窗口 → Rust：转发播放状态给系统媒体浮层（SMTC）；
-	 *  非 Windows 平台为 no-op（本项目 Windows 优先，规范见技术设计文档 §6）
-	 */
-	smtcUpdate: (state: SmtcState) => typedError<null, AppErrorDto>(__TAURI_INVOKE("smtc_update", { state })),
-	trackGet: (id: number) => typedError<{
-	id: number,
-	path: string,
-	title: string,
-	artist: string | null,
-	album: string | null,
-	trackNo: number | null,
-	durationSec: number | null,
-	sampleRate: number | null,
-	bitrate: number | null,
-	year: number | null,
-	genre: string | null,
-	coverFile: string | null,
-} | null, AppErrorDto>(__TAURI_INVOKE("track_get", { id })),
-	tracksQuery: (page: number | null, pageSize: number | null, sort: string | null) => typedError<TrackPage, AppErrorDto>(__TAURI_INVOKE("tracks_query", { page, pageSize, sort })),
+  albumTracks: (albumId: number) =>
+    typedError<Track[], AppErrorDto>(__TAURI_INVOKE("album_tracks", { albumId })),
+  albumsQuery: () => typedError<AlbumInfo[], AppErrorDto>(__TAURI_INVOKE("albums_query")),
+  artistTracks: (artistId: number) =>
+    typedError<Track[], AppErrorDto>(__TAURI_INVOKE("artist_tracks", { artistId })),
+  artistsQuery: () => typedError<ArtistInfo[], AppErrorDto>(__TAURI_INVOKE("artists_query")),
+  coverPath: (file: string) =>
+    typedError<string | null, AppErrorDto>(__TAURI_INVOKE("cover_path", { file })),
+  favoriteToggle: (trackId: number) =>
+    typedError<boolean, AppErrorDto>(__TAURI_INVOKE("favorite_toggle", { trackId })),
+  /**  收藏 id 集合（前端行内红心状态用，避免逐行查询） */
+  favoritesIds: () => typedError<number[], AppErrorDto>(__TAURI_INVOKE("favorites_ids")),
+  favoritesList: () => typedError<Track[], AppErrorDto>(__TAURI_INVOKE("favorites_list")),
+  folderAdd: (path: string) =>
+    typedError<Folder, AppErrorDto>(__TAURI_INVOKE("folder_add", { path })),
+  folderList: () => typedError<Folder[], AppErrorDto>(__TAURI_INVOKE("folder_list")),
+  folderRemove: (id: number) =>
+    typedError<boolean, AppErrorDto>(__TAURI_INVOKE("folder_remove", { id })),
+  historyAdd: (trackId: number) =>
+    typedError<null, AppErrorDto>(__TAURI_INVOKE("history_add", { trackId })),
+  libraryRescan: () => typedError<null, AppErrorDto>(__TAURI_INVOKE("library_rescan")),
+  lyricsGet: (trackId: number) =>
+    typedError<string | null, AppErrorDto>(__TAURI_INVOKE("lyrics_get", { trackId })),
+  overlayHide: () => typedError<null, AppErrorDto>(__TAURI_INVOKE("overlay_hide")),
+  /**  锁定⇄调整态（锁定 = 鼠标完全穿透） */
+  overlaySetLocked: (locked: boolean) =>
+    typedError<null, AppErrorDto>(__TAURI_INVOKE("overlay_set_locked", { locked })),
+  /**  透明度调节 0.3–0.9，即时生效并持久化 */
+  overlaySetOpacity: (opacity: number | null) =>
+    typedError<null, AppErrorDto>(__TAURI_INVOKE("overlay_set_opacity", { opacity })),
+  /**  配置调整/锁定切换的全局快捷键（设置页调用，即时生效并持久化） */
+  overlaySetShortcut: (shortcut: string) =>
+    typedError<null, AppErrorDto>(__TAURI_INVOKE("overlay_set_shortcut", { shortcut })),
+  /**  显示/隐藏迷你悬浮窗（托盘与主窗口播放条共用入口） */
+  overlayToggle: () => typedError<null, AppErrorDto>(__TAURI_INVOKE("overlay_toggle")),
+  playlistAddTracks: (id: number, trackIds: number[]) =>
+    typedError<number, AppErrorDto>(__TAURI_INVOKE("playlist_add_tracks", { id, trackIds })),
+  playlistCreate: (name: string) =>
+    typedError<Playlist, AppErrorDto>(__TAURI_INVOKE("playlist_create", { name })),
+  playlistDelete: (id: number) =>
+    typedError<null, AppErrorDto>(__TAURI_INVOKE("playlist_delete", { id })),
+  /**  导出歌单为 UTF-8 M3U8 文件（绝对路径，foobar2000 兼容），返回写入曲目数 */
+  playlistExport: (id: number, path: string) =>
+    typedError<number, AppErrorDto>(__TAURI_INVOKE("playlist_export", { id, path })),
+  /**  从 M3U8 文件导入为新歌单，返回 新歌单id/导入数/跳过数 */
+  playlistImport: (path: string, name: string) =>
+    typedError<PlaylistImport, AppErrorDto>(__TAURI_INVOKE("playlist_import", { path, name })),
+  playlistList: () => typedError<Playlist[], AppErrorDto>(__TAURI_INVOKE("playlist_list")),
+  playlistRemoveTrack: (id: number, trackId: number) =>
+    typedError<number, AppErrorDto>(__TAURI_INVOKE("playlist_remove_track", { id, trackId })),
+  playlistRename: (id: number, name: string) =>
+    typedError<null, AppErrorDto>(__TAURI_INVOKE("playlist_rename", { id, name })),
+  playlistReorder: (id: number, trackIds: number[]) =>
+    typedError<number, AppErrorDto>(__TAURI_INVOKE("playlist_reorder", { id, trackIds })),
+  playlistTracks: (id: number) =>
+    typedError<Track[], AppErrorDto>(__TAURI_INVOKE("playlist_tracks", { id })),
+  searchTracks: (q: string, page: number | null, pageSize: number | null) =>
+    typedError<TrackPage, AppErrorDto>(__TAURI_INVOKE("search_tracks", { q, page, pageSize })),
+  settingsGet: (key: string) =>
+    typedError<string | null, AppErrorDto>(__TAURI_INVOKE("settings_get", { key })),
+  settingsSet: (key: string, value: string) =>
+    typedError<null, AppErrorDto>(__TAURI_INVOKE("settings_set", { key, value })),
+  /**
+   *  主窗口 → Rust：转发播放状态给系统媒体浮层（SMTC）；
+   *  非 Windows 平台为 no-op（本项目 Windows 优先，规范见技术设计文档 §6）
+   */
+  smtcUpdate: (state: SmtcState) =>
+    typedError<null, AppErrorDto>(__TAURI_INVOKE("smtc_update", { state })),
+  historyRecent: (limit: number | null) =>
+    typedError<Track[], AppErrorDto>(__TAURI_INVOKE("history_recent", { limit })),
+  historyTop: (limit: number | null) =>
+    typedError<Track[], AppErrorDto>(__TAURI_INVOKE("history_top", { limit })),
+  trackGet: (id: number) =>
+    typedError<
+      {
+        id: number;
+        path: string;
+        title: string;
+        artist: string | null;
+        album: string | null;
+        trackNo: number | null;
+        durationSec: number | null;
+        sampleRate: number | null;
+        bitrate: number | null;
+        year: number | null;
+        genre: string | null;
+        coverFile: string | null;
+      } | null,
+      AppErrorDto
+    >(__TAURI_INVOKE("track_get", { id })),
+  tracksQuery: (page: number | null, pageSize: number | null, sort: string | null) =>
+    typedError<TrackPage, AppErrorDto>(__TAURI_INVOKE("tracks_query", { page, pageSize, sort })),
 };
 
 /* Types */
 /**  专辑卡片（封面墙用，含曲目数） */
 export type AlbumInfo = {
-	id: number,
-	name: string,
-	artist: string,
-	year: number | null,
-	coverFile: string | null,
-	trackCount: number,
+  id: number;
+  name: string;
+  artist: string;
+  year: number | null;
+  coverFile: string | null;
+  trackCount: number;
 };
 
 /**  命令层错误 DTO（specta 类型生成要求 Type） */
 export type AppErrorDto = {
-	message: string,
+  message: string;
 };
 
 /**  艺人条目（艺人视图用，含曲目/专辑数） */
 export type ArtistInfo = {
-	id: number,
-	name: string,
-	trackCount: number,
-	albumCount: number,
+  id: number;
+  name: string;
+  trackCount: number;
+  albumCount: number;
 };
 
 /**  对外 DTO 统一用 i32/u32（specta-typescript 禁止 i64/u64 导出），DB 层内部仍用 i64 */
 export type Folder = {
-	id: number,
-	path: string,
+  id: number;
+  path: string;
 };
 
 /**  歌单（侧边栏与歌单视图用） */
 export type Playlist = {
-	id: number,
-	name: string,
-	trackCount: number,
-	createdAt: string,
+  id: number;
+  name: string;
+  trackCount: number;
+  createdAt: string;
+};
+
+/**  M3U8 导入结果：added 为按曲库匹配入库的曲目数，skipped 为未命中跳过数 */
+export type PlaylistImport = {
+  playlistId: number;
+  added: number;
+  skipped: number;
 };
 
 /**  SMTC 转发载荷（主窗口 playerStore → Rust → 系统媒体浮层） */
 export type SmtcState = {
-	title: string,
-	artist: string | null,
-	isPlaying: boolean,
-	positionSec: number | null,
-	durationSec: number | null,
-	coverFile: string | null,
+  title: string;
+  artist: string | null;
+  isPlaying: boolean;
+  positionSec: number | null;
+  durationSec: number | null;
+  coverFile: string | null;
 };
 
 export type Track = {
-	id: number,
-	path: string,
-	title: string,
-	artist: string | null,
-	album: string | null,
-	trackNo: number | null,
-	durationSec: number | null,
-	sampleRate: number | null,
-	bitrate: number | null,
-	year: number | null,
-	genre: string | null,
-	coverFile: string | null,
+  id: number;
+  path: string;
+  title: string;
+  artist: string | null;
+  album: string | null;
+  trackNo: number | null;
+  durationSec: number | null;
+  sampleRate: number | null;
+  bitrate: number | null;
+  year: number | null;
+  genre: string | null;
+  coverFile: string | null;
 };
 
 export type TrackPage = {
-	items: Track[],
-	total: number,
+  items: Track[];
+  total: number;
 };
 
 /* Tauri Specta runtime */
-async function typedError<T, E>(result: Promise<T>): Promise<{ status: "ok"; data: T } | { status: "error"; error: E }> {
-    try {
-        return { status: "ok", data: await result };
-    } catch (e) {
-        if (e instanceof Error) throw e;
-        return { status: "error", error: e as any };
-    }
+async function typedError<T, E>(
+  result: Promise<T>,
+): Promise<{ status: "ok"; data: T } | { status: "error"; error: E }> {
+  try {
+    return { status: "ok", data: await result };
+  } catch (e) {
+    if (e instanceof Error) throw e;
+    return { status: "error", error: e as any };
+  }
 }
-

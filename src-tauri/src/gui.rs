@@ -31,6 +31,8 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
         crate::commands::playlists::playlist_add_tracks,
         crate::commands::playlists::playlist_create,
         crate::commands::playlists::playlist_delete,
+        crate::commands::playlists::playlist_export,
+        crate::commands::playlists::playlist_import,
         crate::commands::playlists::playlist_list,
         crate::commands::playlists::playlist_remove_track,
         crate::commands::playlists::playlist_rename,
@@ -40,6 +42,8 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
         crate::commands::settings::settings_get,
         crate::commands::settings::settings_set,
         crate::commands::smtc::smtc_update,
+        crate::commands::stats::history_recent,
+        crate::commands::stats::history_top,
         crate::commands::tracks::track_get,
         crate::commands::tracks::tracks_query,
     ])

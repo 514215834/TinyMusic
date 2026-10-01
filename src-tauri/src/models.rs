@@ -83,6 +83,15 @@ pub struct Playlist {
     pub created_at: String,
 }
 
+/// M3U8 导入结果：added 为按曲库匹配入库的曲目数，skipped 为未命中跳过数
+#[derive(Debug, Clone, Serialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub struct PlaylistImport {
+    pub playlist_id: i32,
+    pub added: u32,
+    pub skipped: u32,
+}
+
 /// SMTC 转发载荷（主窗口 playerStore → Rust → 系统媒体浮层）
 #[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]

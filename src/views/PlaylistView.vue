@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
 import { useRoute } from "vue-router";
-import { ListMusic, Plus } from "lucide-vue-next";
+import { save } from "@tauri-apps/plugin-dialog";
+import { Download, ListMusic, Plus } from "lucide-vue-next";
 import AddTracksModal from "../components/AddTracksModal.vue";
 import TrackTable from "../components/TrackTable.vue";
 import { playlistsApi, type Playlist, type Track } from "../services/playlists";
@@ -11,6 +12,7 @@ const route = useRoute();
 const playlist = ref<Playlist | null>(null);
 const tracks = ref<Track[]>([]);
 const showAdd = ref(false);
+const exportError = ref("");
 
 const existingIds = computed(() => tracks.value.map((t) => t.id));
 
@@ -53,6 +55,22 @@ async function reorder(from: number, to: number) {
     .filter((t): t is Track => !!t);
   await playlistsApi.reorder(playlist.value.id, ids);
 }
+
+/* M3：导出为 M3U8（save 对话框选择目标路径） */
+async function exportPlaylist() {
+  if (!playlist.value) return;
+  exportError.value = "";
+  const path = await save({
+    defaultPath: `${playlist.value.name}.m3u8`,
+    filters: [{ name: "M3U8", extensions: ["m3u8"] }],
+  });
+  if (typeof path !== "string") return;
+  try {
+    await playlistsApi.exportM3u8(playlist.value.id, path);
+  } catch (e) {
+    exportError.value = String(e instanceof Error ? e.message : e);
+  }
+}
 </script>
 
 <template>
@@ -62,6 +80,11 @@ async function reorder(from: number, to: number) {
       <h2>{{ playlist?.name ?? "…" }}</h2>
       <span class="dim">{{ t("albums.trackCount", { n: tracks.length }) }}</span>
       <div class="spacer"></div>
+      <span v-if="exportError" class="error">{{ exportError }}</span>
+      <button class="ghost" @click="exportPlaylist">
+        <Download :size="14" />
+        {{ t("playlist.export") }}
+      </button>
       <button class="add" @click="showAdd = true">
         <Plus :size="14" />
         {{ t("playlist.addTracks") }}
@@ -123,5 +146,31 @@ async function reorder(from: number, to: number) {
 
 .add svg {
   display: block;
+}
+
+.ghost {
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-elev);
+  color: var(--text);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+}
+
+.ghost svg {
+  display: block;
+}
+
+.ghost:hover {
+  background: var(--bg-hover);
+}
+
+.error {
+  color: #ef4444;
+  font-size: 12px;
 }
 </style>

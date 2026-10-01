@@ -1,8 +1,9 @@
-use rusqlite::params;
+use rusqlite::{params, Connection};
 use tauri::State;
 
 use crate::error::{AppError, AppErrorDto, AppResult};
-use crate::models::{Playlist, Track};
+use crate::library::m3u8;
+use crate::models::{Playlist, PlaylistImport, Track};
 use crate::AppState;
 
 use super::tracks::{row_to_track, TRACK_SELECT};
@@ -98,8 +99,7 @@ pub async fn playlist_delete(state: State<'_, AppState>, id: i32) -> Result<(), 
     delete(&state, id).map_err(AppErrorDto::from)
 }
 
-fn tracks(state: &AppState, id: i32) -> AppResult<Vec<Track>> {
-    let conn = state.conn.lock();
+fn tracks(conn: &Connection, id: i32) -> AppResult<Vec<Track>> {
     let sql = format!(
         "{TRACK_SELECT} JOIN playlist_tracks pt ON pt.track_id = t.id \
          WHERE pt.playlist_id = ?1 ORDER BY pt.position"
@@ -117,7 +117,87 @@ pub async fn playlist_tracks(
     state: State<'_, AppState>,
     id: i32,
 ) -> Result<Vec<Track>, AppErrorDto> {
-    tracks(&state, id).map_err(AppErrorDto::from)
+    tracks(&state.conn.lock(), id).map_err(AppErrorDto::from)
+}
+
+/// 导出歌单为 UTF-8 M3U8 文件（绝对路径，foobar2000 兼容），返回写入曲目数
+#[tauri::command]
+#[specta::specta]
+pub async fn playlist_export(
+    state: State<'_, AppState>,
+    id: i32,
+    path: String,
+) -> Result<u32, AppErrorDto> {
+    let track_list = tracks(&state.conn.lock(), id).map_err(AppErrorDto::from)?;
+    let count = track_list.len() as u32;
+    let text = m3u8::format_m3u8(&track_list);
+    std::fs::write(&path, text).map_err(AppError::from)?;
+    Ok(count)
+}
+
+/// M3U8 条目 → 新歌单：按曲库路径归一化匹配，未命中曲目跳过不计入
+fn import_entries(
+    conn: &mut Connection,
+    entries: &[m3u8::M3u8Entry],
+    name: &str,
+) -> AppResult<PlaylistImport> {
+    let name = clean_name(name)?;
+    let path_to_id: std::collections::HashMap<String, i64> = {
+        let mut stmt = conn.prepare("SELECT id, path FROM tracks")?;
+        let rows = stmt.query_map([], |r| Ok((r.get::<_, i64>(0)?, r.get::<_, String>(1)?)))?;
+        rows.collect::<Result<std::collections::HashMap<_, _>, _>>()?
+            .into_iter()
+            .map(|(id, path)| (m3u8::normalize_path(&path), id))
+            .collect()
+    };
+
+    let matched: Vec<i64> = entries
+        .iter()
+        .filter_map(|e| path_to_id.get(&m3u8::normalize_path(&e.path)).copied())
+        .collect();
+    if matched.is_empty() {
+        return Err(AppError::Message(
+            "M3U8 中的曲目都不在当前曲库：请先导入对应音乐文件夹".into(),
+        ));
+    }
+    let skipped = entries.len() - matched.len();
+
+    let tx = conn.transaction()?;
+    tx.execute("INSERT INTO playlists(name) VALUES (?1)", params![name])?;
+    let playlist_id: i64 =
+        tx.query_row("SELECT last_insert_rowid()", [], |r| r.get(0))?;
+    for (pos, track_id) in matched.iter().enumerate() {
+        tx.execute(
+            "INSERT OR IGNORE INTO playlist_tracks(playlist_id, track_id, position) \
+             VALUES (?1, ?2, ?3)",
+            params![playlist_id, track_id, pos as i64],
+        )?;
+    }
+    tx.commit()?;
+    Ok(PlaylistImport {
+        playlist_id: playlist_id as i32,
+        added: matched.len() as u32,
+        skipped: skipped as u32,
+    })
+}
+
+/// 从 M3U8 文件导入为新歌单，返回 新歌单id/导入数/跳过数
+#[tauri::command]
+#[specta::specta]
+pub async fn playlist_import(
+    state: State<'_, AppState>,
+    path: String,
+    name: String,
+) -> Result<PlaylistImport, AppErrorDto> {
+    let bytes = std::fs::read(&path).map_err(AppError::from)?;
+    let text = String::from_utf8(bytes)
+        .map_err(|_| AppError::Message("M3U8 文件必须是 UTF-8 编码".into()))?;
+    let entries = m3u8::parse_m3u8(&text);
+    if entries.is_empty() {
+        return Err(AppError::Message("M3U8 中没有曲目".into()).into());
+    }
+    let mut conn = state.conn.lock();
+    import_entries(&mut conn, &entries, &name).map_err(AppErrorDto::from)
 }
 
 /// 追加曲目（已存在的自动跳过），返回歌单曲目数
@@ -221,7 +301,10 @@ pub async fn playlist_reorder(
 
 #[cfg(test)]
 mod tests {
+    use super::import_entries;
     use crate::db;
+    use crate::library::m3u8;
+    use rusqlite::params;
 
     fn seed(conn: &rusqlite::Connection) -> (i64, Vec<i64>) {
         conn.execute_batch(
@@ -287,5 +370,75 @@ mod tests {
                 .collect()
         };
         assert_eq!(positions, vec![0, 1]);
+    }
+
+    #[test]
+    fn m3u8导入按归一化路径匹配并跳过未命中() {
+        let mut conn = db::open_in_memory().unwrap();
+        seed(&conn);
+        let entries = vec![
+            m3u8::M3u8Entry {
+                path: "A.MP3".into(), // 大小写差异命中
+                title: None,
+                duration_sec: None,
+            },
+            m3u8::M3u8Entry {
+                path: "C:/曲库/b.MP3".into(), // 路径不同：不命中
+                title: None,
+                duration_sec: None,
+            },
+            m3u8::M3u8Entry {
+                path: "b.mp3".into(),
+                title: None,
+                duration_sec: None,
+            },
+            m3u8::M3u8Entry {
+                path: "missing.mp3".into(),
+                title: None,
+                duration_sec: None,
+            },
+        ];
+        let result = import_entries(&mut conn, &entries, "导入歌单").unwrap();
+        assert_eq!(result.added, 2);
+        assert_eq!(result.skipped, 2);
+        // 顺序保持 M3U8 原始顺序（a 在 b 前）
+        let titles: Vec<String> = {
+            let mut stmt = conn
+                .prepare(
+                    "SELECT t.title FROM tracks t \
+                     JOIN playlist_tracks pt ON pt.track_id = t.id \
+                     WHERE pt.playlist_id = ?1 ORDER BY pt.position",
+                )
+                .unwrap();
+            stmt.query_map(params![result.playlist_id], |r| r.get(0))
+                .unwrap()
+                .map(|r| r.unwrap())
+                .collect()
+        };
+        assert_eq!(titles, vec!["A", "B"]);
+    }
+
+    #[test]
+    fn m3u8导入全部未命中时报错() {
+        let mut conn = db::open_in_memory().unwrap();
+        seed(&conn);
+        let entries = vec![m3u8::M3u8Entry {
+            path: "nope.mp3".into(),
+            title: None,
+            duration_sec: None,
+        }];
+        assert!(import_entries(&mut conn, &entries, "X").is_err());
+    }
+
+    #[test]
+    fn m3u8导入拒绝空白歌单名() {
+        let mut conn = db::open_in_memory().unwrap();
+        seed(&conn);
+        let entries = vec![m3u8::M3u8Entry {
+            path: "a.mp3".into(),
+            title: None,
+            duration_sec: None,
+        }];
+        assert!(import_entries(&mut conn, &entries, "  ").is_err());
     }
 }

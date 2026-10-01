@@ -13,6 +13,74 @@ const MODES: PlayMode[] = ["sequential", "repeat-all", "repeat-one", "shuffle"];
 
 /** <audio> 引擎单例：播放状态唯一事实源在 store（技术设计文档 §2.3） */
 const audio = new Audio();
+// asset 协议响应恒带 Access-Control-Allow-Origin（tauri asset.rs），anonymous 模式
+// 让媒体走 CORS 清洁通道，MediaElementSource（EQ）不会被跨域污染输出静音
+audio.crossOrigin = "anonymous";
+
+/** EQ 十频段（Hz）：首尾 shelf，中间 peaking（技术设计文档 §3 M3） */
+export const EQ_FREQS = [31, 62, 125, 250, 500, 1000, 2000, 4000, 8000, 16000] as const;
+export const EQ_MIN = -12;
+export const EQ_MAX = 12;
+/** 倍速档位（M3） */
+export const SPEEDS = [0.75, 1, 1.25, 1.5, 2] as const;
+
+/* 引擎级设置状态：与 audio 单例同属模块级，store 负责暴露与持久化 */
+const speed = ref(1);
+const eqEnabled = ref(false);
+const eqGains = ref<number[]>(Array<number>(EQ_FREQS.length).fill(0));
+const outputDeviceId = ref("");
+
+let audioCtx: AudioContext | null = null;
+let eqFilters: BiquadFilterNode[] = [];
+
+/** 懒建 EQ 链：首次启用 EQ 才把 <audio> 路由进 Web Audio（此后常驻，旁路=增益归零） */
+function ensureEqGraph() {
+  if (audioCtx) return;
+  const ctx = new AudioContext();
+  let node: AudioNode = ctx.createMediaElementSource(audio);
+  eqFilters = EQ_FREQS.map((freq, i) => {
+    const filter = ctx.createBiquadFilter();
+    filter.type = i === 0 ? "lowshelf" : i === EQ_FREQS.length - 1 ? "highshelf" : "peaking";
+    filter.frequency.value = freq;
+    filter.Q.value = 1.1;
+    node.connect(filter);
+    node = filter;
+    return filter;
+  });
+  node.connect(ctx.destination);
+  audioCtx = ctx;
+}
+
+/** 应用当前 EQ 状态；autoplay 策略下 AudioContext 可能在手势后才可 resume */
+function applyEq() {
+  if (!audioCtx) {
+    if (!eqEnabled.value) return;
+    ensureEqGraph();
+  }
+  if (!audioCtx) return;
+  if (audioCtx.state === "suspended") void audioCtx.resume().catch(() => {});
+  eqFilters.forEach((filter, i) => {
+    filter.gain.value = eqEnabled.value ? (eqGains.value[i] ?? 0) : 0;
+  });
+}
+
+function resumeEqCtx() {
+  if (audioCtx && audioCtx.state === "suspended") void audioCtx.resume().catch(() => {});
+}
+
+type SinkIdCapable = HTMLMediaElement & { setSinkId?: (id: string) => Promise<void> };
+
+/** 切换输出设备：setSinkId 即时生效且不中断播放（WebView2 支持） */
+async function applySink(deviceId: string): Promise<boolean> {
+  const el = audio as SinkIdCapable;
+  if (typeof el.setSinkId !== "function") return false;
+  try {
+    if (deviceId) await el.setSinkId(deviceId);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 /**
  * 播放状态 store（技术设计文档 §3 播放引擎）。
@@ -35,10 +103,29 @@ export const usePlayerStore = defineStore("player", () => {
   function saveSettings() {
     void settingsApi.set(
       "player",
-      JSON.stringify({ volume: volume.value, muted: muted.value, mode: mode.value }),
+      JSON.stringify({
+        volume: volume.value,
+        muted: muted.value,
+        mode: mode.value,
+        speed: speed.value,
+      }),
     );
   }
   const saveSettingsDebounced = useDebounceFn(saveSettings, 500);
+
+  /** 引擎级音频设置（M3）：输出设备 + EQ 状态，独立于播放进度设置 */
+  function saveAudioSettings() {
+    void settingsApi
+      .set(
+        "audio",
+        JSON.stringify({
+          outputDeviceId: outputDeviceId.value,
+          eq: { enabled: eqEnabled.value, gains: eqGains.value },
+        }),
+      )
+      .catch(() => {});
+  }
+  const saveAudioSettingsDebounced = useDebounceFn(saveAudioSettings, 300);
 
   function savePosition() {
     if (!currentTrack.value) return;
@@ -55,13 +142,43 @@ export const usePlayerStore = defineStore("player", () => {
     try {
       const raw = await settingsApi.get("player");
       if (raw) {
-        const saved = JSON.parse(raw) as { volume?: number; muted?: boolean; mode?: PlayMode };
+        const saved = JSON.parse(raw) as {
+          volume?: number;
+          muted?: boolean;
+          mode?: PlayMode;
+          speed?: number;
+        };
         volume.value = typeof saved.volume === "number" ? saved.volume : 0.8;
         muted.value = saved.muted === true;
         mode.value = MODES.includes(saved.mode as PlayMode)
           ? (saved.mode as PlayMode)
           : "sequential";
+        if (typeof saved.speed === "number" && saved.speed > 0) speed.value = saved.speed;
       }
+      /* M3 引擎级设置：输出设备切换 + EQ 恢复（EQ 需在 src 加载后重建路由） */
+      const rawAudio = await settingsApi.get("audio");
+      if (rawAudio) {
+        const savedAudio = JSON.parse(rawAudio) as {
+          outputDeviceId?: string;
+          eq?: { enabled?: boolean; gains?: number[] };
+        };
+        if (typeof savedAudio.outputDeviceId === "string") {
+          outputDeviceId.value = savedAudio.outputDeviceId;
+          await applySink(savedAudio.outputDeviceId);
+        }
+        if (savedAudio.eq) {
+          eqEnabled.value = savedAudio.eq.enabled === true;
+          if (
+            Array.isArray(savedAudio.eq.gains) &&
+            savedAudio.eq.gains.length === EQ_FREQS.length
+          ) {
+            eqGains.value = savedAudio.eq.gains.map((g) =>
+              Math.min(EQ_MAX, Math.max(EQ_MIN, Number(g) || 0)),
+            );
+          }
+        }
+      }
+      if (eqEnabled.value) applyEq();
       const last = await settingsApi.get("lastTrack");
       if (last) {
         const saved = JSON.parse(last) as { trackId?: number; positionSec?: number };
@@ -122,6 +239,7 @@ export const usePlayerStore = defineStore("player", () => {
     currentTrack.value = track;
     positionSec.value = 0;
     durationSec.value = 0;
+    resumeEqCtx(); // autoplay 策略：用户手势路径上恢复被挂起的 AudioContext
     audio.src = convertFileSrc(track.path);
     void audio.play().catch(() => {});
     savePosition();
@@ -161,12 +279,56 @@ export const usePlayerStore = defineStore("player", () => {
 
   function toggle() {
     if (!currentTrack.value) return;
+    resumeEqCtx();
     if (audio.paused) {
       if (!audio.src) audio.src = convertFileSrc(currentTrack.value.path);
       void audio.play().catch(() => {});
     } else {
       audio.pause();
     }
+  }
+
+  /* ---- M3：倍速 / EQ / 输出设备 ---- */
+
+  function setSpeed(v: number) {
+    if (!Number.isFinite(v) || v <= 0) return;
+    speed.value = v;
+    saveSettings();
+  }
+
+  /** 播放条倍速按钮：在 SPEEDS 档位间循环 */
+  function cycleSpeed() {
+    const idx = SPEEDS.indexOf(speed.value as (typeof SPEEDS)[number]);
+    setSpeed(SPEEDS[(idx + 1) % SPEEDS.length] ?? 1);
+  }
+
+  function setEqEnabled(enabled: boolean) {
+    eqEnabled.value = enabled;
+    applyEq();
+    saveAudioSettings();
+  }
+
+  function setEqGain(index: number, gain: number) {
+    if (index < 0 || index >= EQ_FREQS.length) return;
+    eqGains.value = eqGains.value.map((g, i) =>
+      i === index ? Math.min(EQ_MAX, Math.max(EQ_MIN, gain)) : g,
+    );
+    applyEq();
+    saveAudioSettingsDebounced();
+  }
+
+  function resetEq() {
+    eqGains.value = eqGains.value.map(() => 0);
+    applyEq();
+    saveAudioSettings();
+  }
+
+  /** 切换输出设备；返回 false 表示引擎不支持或拒绝（设备失效等） */
+  async function setOutputDevice(deviceId: string): Promise<boolean> {
+    const ok = await applySink(deviceId);
+    outputDeviceId.value = deviceId;
+    saveAudioSettings();
+    return ok;
   }
 
   function next(auto = false) {
@@ -300,6 +462,11 @@ export const usePlayerStore = defineStore("player", () => {
       audio.volume = muted.value ? 0 : volume.value;
       audio.muted = muted.value;
     });
+    // 倍速（M3）：defaultPlaybackRate 保证换曲后保持
+    watchEffect(() => {
+      audio.playbackRate = speed.value;
+      audio.defaultPlaybackRate = speed.value;
+    });
     watch(volume, saveSettingsDebounced);
     watch(muted, saveSettingsDebounced);
     // 播放历史入库：仅在曲目变化时记录一条（playback:changed 镜像之外的本地数据流）
@@ -367,6 +534,10 @@ export const usePlayerStore = defineStore("player", () => {
     positionSec,
     durationSec,
     nowPlayingOpen,
+    speed,
+    eqEnabled,
+    eqGains,
+    outputDeviceId,
     play,
     playNext,
     addToQueue,
@@ -381,6 +552,12 @@ export const usePlayerStore = defineStore("player", () => {
     setVolume,
     toggleMute,
     cycleMode,
+    setSpeed,
+    cycleSpeed,
+    setEqEnabled,
+    setEqGain,
+    resetEq,
+    setOutputDevice,
     /** 直接读引擎时间（rAF 歌词同步用，绕过 timeupdate 的 ~250ms 粒度） */
     getTime: () => audio.currentTime,
     init,

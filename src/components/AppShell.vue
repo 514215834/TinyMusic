@@ -1,14 +1,18 @@
 <script setup lang="ts">
 import { onMounted, ref } from "vue";
+import { useRouter } from "vue-router";
+import { open } from "@tauri-apps/plugin-dialog";
 import {
   Disc3,
   Heart,
+  History,
   Library,
   ListMusic,
   Pencil,
   Plus,
   Settings,
   Trash2,
+  Upload,
   User,
 } from "lucide-vue-next";
 import { playlistsApi, type Playlist } from "../services/playlists";
@@ -21,6 +25,7 @@ import NowPlaying from "./NowPlaying.vue";
 // 主窗口三区布局：左侧导航 + 中部内容 + 底部播放条（功能设计文档 §4.1）
 
 useKeyboardShortcuts();
+const router = useRouter();
 const player = usePlayerStore();
 const settings = useSettingsStore();
 void settings.load();
@@ -75,6 +80,30 @@ async function remove(p: Playlist) {
   await playlistsApi.remove(p.id);
   await loadPlaylists();
 }
+
+/* M3：从 M3U8 导入为新歌单（曲库中未命中的路径自动跳过，结果由后端返回） */
+const importError = ref("");
+
+function playlistNameFromPath(path: string) {
+  const file = path.split(/[\\/]/).pop() ?? path;
+  return file.replace(/\.(m3u8?|M3U8?)$/, "");
+}
+
+async function importPlaylist() {
+  importError.value = "";
+  const selected = await open({
+    multiple: false,
+    filters: [{ name: "M3U8", extensions: ["m3u8", "m3u"] }],
+  });
+  if (typeof selected !== "string") return;
+  try {
+    const result = await playlistsApi.importM3u8(selected, playlistNameFromPath(selected));
+    await loadPlaylists();
+    void router.push({ name: "playlist", params: { id: result.playlistId } });
+  } catch (e) {
+    importError.value = String(e instanceof Error ? e.message : e);
+  }
+}
 </script>
 
 <template>
@@ -98,6 +127,10 @@ async function remove(p: Playlist) {
           <Heart :size="16" />
           {{ t("nav.favorites") }}
         </RouterLink>
+        <RouterLink class="nav-item" :to="{ name: 'history' }">
+          <History :size="16" />
+          {{ t("nav.history") }}
+        </RouterLink>
         <RouterLink class="nav-item" :to="{ name: 'settings' }">
           <Settings :size="16" />
           {{ t("nav.settings") }}
@@ -106,10 +139,14 @@ async function remove(p: Playlist) {
 
       <div class="playlists-head">
         <span class="playlists-title dim">{{ t("sidebar.playlists") }}</span>
+        <button class="pl-add" :title="t('playlist.import')" @click="importPlaylist">
+          <Upload :size="13" />
+        </button>
         <button class="pl-add" :title="t('sidebar.addPlaylist')" @click="startCreate">
           <Plus :size="13" />
         </button>
       </div>
+      <div v-if="importError" class="pl-empty import-error">{{ importError }}</div>
 
       <div v-if="creating" class="pl-editor">
         <input
@@ -363,6 +400,11 @@ async function remove(p: Playlist) {
 .pl-empty {
   padding: 6px 10px;
   font-size: 12px;
+}
+
+.import-error {
+  color: #ef4444;
+  word-break: break-all;
 }
 
 .content {

@@ -10,4 +10,5 @@ pub mod playlists;
 pub mod search;
 pub mod settings;
 pub mod smtc;
+pub mod stats;
 pub mod tracks;

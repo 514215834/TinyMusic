@@ -115,6 +115,9 @@ function toggleOverlay() {
     </div>
 
     <div class="right">
+      <button class="speed" :title="t('player.speed')" @click="player.cycleSpeed()">
+        {{ player.speed.toFixed(2).replace(/\.?0+$/, "") }}×
+      </button>
       <button class="icon" :title="t(modeMeta.label)" @click="player.cycleMode()">
         <component :is="modeMeta.icon" :size="16" />
       </button>
@@ -285,5 +288,23 @@ function toggleOverlay() {
 
 .slider.volume {
   flex: 0 1 100px;
+}
+
+.speed {
+  min-width: 40px;
+  padding: 4px 6px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.speed:hover {
+  background: var(--bg-hover);
+  color: var(--text);
 }
 </style>

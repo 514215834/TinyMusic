@@ -40,3 +40,9 @@ export async function coverUrl(file: string | null | undefined): Promise<string 
   const path = await libraryApi.coverPath(file);
   return path ? convertFileSrc(path) : null;
 }
+
+/** 播放统计（M3）：最近播放 / 最常播放，数据源 play_history */
+export const statsApi = {
+  recent: async (limit = 100) => unwrap(await commands.historyRecent(limit)),
+  top: async (limit = 100) => unwrap(await commands.historyTop(limit)),
+};
