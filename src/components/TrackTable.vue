@@ -142,17 +142,27 @@ function onBatchSaved() {
 const editingTrack = ref<Track | null>(null);
 const scrapingTrack = ref<Track | null>(null);
 
+/** 行对象回填后，同步正在播放的同曲目镜像：currentTrack 若来自启动恢复的
+ *  trackGet 实例（与行对象不同引用），就地更新传导不到播放条/正在播放页 */
+function syncPlayingMirror(updated: Track) {
+  const cur = player.currentTrack;
+  if (cur && cur.id === updated.id && cur !== updated) Object.assign(cur, updated);
+}
+
 async function onScrapeApplied(candidate: { artworkUrl?: string | null }) {
   const track = scrapingTrack.value;
   if (!track || !candidate.artworkUrl) return;
   // apply_track 返回落库的封面缓存文件名，回填行对象（useCovers 按 coverFile 变化重解析）
   const updated = await libraryApi.trackGet(track.id);
-  if (updated) track.coverFile = updated.coverFile;
+  if (!updated) return;
+  Object.assign(track, updated);
+  syncPlayingMirror(updated);
 }
 
 /** 标签保存：就地更新行对象（列表与弹窗共享同一响应式引用，所有视图同步刷新） */
 function onTagSaved(updated: Track) {
   Object.assign(editingTrack.value ?? updated, updated);
+  syncPlayingMirror(updated);
 }
 </script>
 

@@ -14,13 +14,18 @@ const tracks = ref<Track[]>([]);
 const cover = ref<string | null>(null);
 const scraping = ref(false);
 
-async function load(id: number) {
-  album.value = null;
-  tracks.value = [];
+async function refresh(id: number) {
   const [albums, list] = await Promise.all([libraryApi.albumsQuery(), libraryApi.albumTracks(id)]);
   album.value = albums.find((a) => a.id === id) ?? null;
   tracks.value = list;
   cover.value = await coverUrl(album.value?.coverFile);
+}
+
+/** 首次进入/切换专辑：先清空避免展示上一专辑的残留数据 */
+async function load(id: number) {
+  album.value = null;
+  tracks.value = [];
+  await refresh(id);
 }
 
 onMounted(() => void load(Number(route.params.id)));
@@ -65,7 +70,7 @@ watch(
         :name="album.name"
         :artist="album.artist"
         @close="scraping = false"
-        @applied="() => void load(album!.id)"
+        @applied="() => void refresh(album!.id)"
       />
     </Teleport>
   </section>

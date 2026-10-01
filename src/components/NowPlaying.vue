@@ -86,6 +86,11 @@ watch(
     void loadLyrics();
   },
 );
+// 切歌 watch 只看 id：就地刮削封面（id 未变）不会触发，这里补封面字段源即时换图
+watch(
+  () => player.currentTrack?.coverFile,
+  () => void loadCover(),
+);
 
 function seekTo(line: LrcLine) {
   if (line.text && line.timeMs >= 0) player.seek(line.timeMs / 1000);

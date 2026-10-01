@@ -8,9 +8,9 @@ import { t } from "../i18n";
 /**
  * 缺失封面批量刮削向导（M6）：逐专辑展示候选（多站点合并，J-Pop iTunes JP 优先），
  * 逐个人工确认——Enter 应用首个候选 / Esc 跳过；未命中可自动跳过。
- * 完成后给 成功/跳过/未命中/失败 统计。
+ * 每张应用即时 emit applied（父视图专辑墙同步点亮，不必等走完全流程），完成给统计。
  */
-const emit = defineEmits<{ close: []; done: [] }>();
+const emit = defineEmits<{ close: []; done: []; applied: [albumId: number, coverFile: string] }>();
 
 const missing = ref<AlbumInfo[]>([]);
 const loadingList = ref(true);
@@ -59,8 +59,9 @@ async function apply(candidate: AlbumCandidate) {
   applying.value = true;
   stepError.value = "";
   try {
-    await scrapeApi.applyAlbum(album.id, candidate);
+    const coverFile = await scrapeApi.applyAlbum(album.id, candidate);
     stats.value.applied += 1;
+    if (coverFile) emit("applied", album.id, coverFile);
     void advance();
   } catch (e) {
     stepError.value = String(e instanceof Error ? e.message : e);

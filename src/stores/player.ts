@@ -502,11 +502,13 @@ export const usePlayerStore = defineStore("player", () => {
         if (id != null) void libraryApi.historyAdd(id).catch(() => {});
       },
     );
-    // SMTC 推送：曲目/播放状态变化（去抖合并）+ 曲目时长就绪
-    watch([currentTrack, isPlaying], pushSmtcDebounced);
+    // SMTC 推送：曲目/播放状态变化（去抖合并）+ 曲目时长就绪；
+    // currentTrack 是浅比较，就地刮削封面要靠 coverFile 源才能补推
+    watch([currentTrack, isPlaying, () => currentTrack.value?.coverFile], pushSmtcDebounced);
     watch(durationSec, pushSmtcDebounced);
-    // playback:changed 广播：曲目、播放状态、模式（即时）+ 播放位置（节流，迷你窗进度条）
-    watch([currentTrack, isPlaying, mode], broadcast);
+    // playback:changed 广播：曲目、播放状态、模式（即时）+ 封面就地更新（迷你窗即时换图）
+    // + 播放位置（节流，迷你窗进度条）
+    watch([currentTrack, isPlaying, mode, () => currentTrack.value?.coverFile], broadcast);
     const broadcastPositionThrottled = useThrottleFn(broadcast, 500, true);
     watch(positionSec, () => void broadcastPositionThrottled());
     // 事件回流：迷你悬浮窗控制指令 / 媒体键 / 托盘播放控制

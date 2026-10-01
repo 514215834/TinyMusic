@@ -12,12 +12,39 @@ const covers = ref<Record<number, string | null>>({});
 const wizardOpen = ref(false);
 const missingCount = computed(() => albums.value.filter((a) => !a.coverFile).length);
 
+/** coverFile → URL 解析记忆：reload/逐张应用时未变化的专辑命中缓存，不重复 IPC */
+const coverCache = new Map<string, string | null>();
+
+async function resolveCover(album: AlbumInfo): Promise<string | null> {
+  if (!album.coverFile) return null;
+  let url = coverCache.get(album.coverFile);
+  if (url === undefined) {
+    url = await coverUrl(album.coverFile);
+    coverCache.set(album.coverFile, url ?? null);
+  }
+  return url ?? null;
+}
+
 async function reload() {
   albums.value = await libraryApi.albumsQuery();
   // 封面就绪后逐张替换占位（列表渲染不阻塞在封面 IO 上）
-  for (const a of albums.value) {
-    covers.value[a.id] = await coverUrl(a.coverFile);
-  }
+  await Promise.all(
+    albums.value.map(async (a) => {
+      covers.value[a.id] = await resolveCover(a);
+    }),
+  );
+}
+
+/** 批量向导逐张应用：就地更新该专辑行，封面墙与缺失计数即时刷新（不等走完向导） */
+async function onWizardApplied(albumId: number, coverFile: string) {
+  const album = albums.value.find((a) => a.id === albumId);
+  if (album) album.coverFile = coverFile;
+  covers.value[albumId] = await coverUrl(coverFile);
+}
+
+function onWizardClose() {
+  wizardOpen.value = false;
+  void reload(); // 中途关闭兜底刷新（逐张 applied 已覆盖，此处幂等）
 }
 
 onMounted(reload);
@@ -54,7 +81,12 @@ function open(album: AlbumInfo) {
     </div>
     <div v-else class="empty dim">{{ t("albums.empty") }}</div>
 
-    <CoverBatchWizard v-if="wizardOpen" @close="wizardOpen = false" @done="reload" />
+    <CoverBatchWizard
+      v-if="wizardOpen"
+      @close="onWizardClose"
+      @done="reload"
+      @applied="onWizardApplied"
+    />
   </section>
 </template>
 
