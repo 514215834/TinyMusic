@@ -1,0 +1,13 @@
+pub mod albums;
+pub mod covers;
+pub mod favorites;
+pub mod folders;
+pub mod history;
+pub mod library;
+pub mod lyrics;
+pub mod overlay;
+pub mod playlists;
+pub mod search;
+pub mod settings;
+pub mod smtc;
+pub mod tracks;
