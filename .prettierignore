@@ -1,0 +1,2 @@
+# tauri-specta 生成文件（gui.rs export_bindings 每次启动重写，勿格式化以免与生成器互相覆盖）
+src/bindings.ts
