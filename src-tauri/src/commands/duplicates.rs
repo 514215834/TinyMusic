@@ -7,7 +7,7 @@ use serde::Deserialize;
 use tauri::State;
 
 use crate::commands::tracks::{row_to_track, TRACK_SELECT};
-use crate::error::{AppError, AppErrorDto, AppResult};
+use crate::error::{AppErrorDto, AppResult};
 use crate::models::{DuplicateGroup, DuplicateItem, DuplicateResolve, Track};
 use crate::AppState;
 
@@ -77,20 +77,24 @@ pub(crate) fn group_duplicates(rows: &[DupRow]) -> Vec<Vec<usize>> {
 #[tauri::command]
 #[specta::specta]
 pub async fn duplicates_scan(state: State<'_, AppState>) -> Result<Vec<DuplicateGroup>, AppErrorDto> {
-    let conn = state.conn.lock();
-    let sql = format!(
-        "{TRACK_SELECT}, t.size, t.created_at ORDER BY t.created_at, t.id"
-    );
-    let mut stmt = conn.prepare(&sql).map_err(AppError::from).map_err(AppErrorDto::from)?;
-    let rows = stmt
-        .query_map([], |r| {
-            let track = row_to_track(r)?;
-            Ok((track, r.get::<_, f64>(12)?, r.get::<_, String>(13)?))
-        })
-        .map_err(AppError::from)
-        .map_err(AppErrorDto::from)?;
-    let all: Vec<(Track, f64, String)> =
-        rows.collect::<Result<Vec<_>, _>>().map_err(AppError::from).map_err(AppErrorDto::from)?;
+    scan_groups(&state.conn.lock()).map_err(AppErrorDto::from)
+}
+
+/// 重复分组（同步纯逻辑，单测直连内存库调用）
+pub(crate) fn scan_groups(conn: &rusqlite::Connection) -> AppResult<Vec<DuplicateGroup>> {
+    // 附加列必须进 SELECT 列表（FROM 之前）：TRACK_SELECT 以 FROM/JOIN 结尾，
+    // 直接尾拼会把 , t.size 解析为交叉连接的"表名"（no such table: t.size）
+    let base = TRACK_SELECT
+        .replacen(" FROM tracks t", ", t.size, t.created_at FROM tracks t", 1)
+        ;
+    debug_assert!(base.contains(", t.size, t.created_at FROM"));
+    let sql = format!("{base} ORDER BY t.created_at, t.id");
+    let mut stmt = conn.prepare(&sql)?;
+    let rows = stmt.query_map([], |r| {
+        let track = row_to_track(r)?;
+        Ok((track, r.get::<_, f64>(12)?, r.get::<_, String>(13)?))
+    })?;
+    let all: Vec<(Track, f64, String)> = rows.collect::<Result<Vec<_>, _>>()?;
     drop(stmt);
 
     let dup_rows: Vec<DupRow> = all
@@ -216,6 +220,27 @@ mod tests {
             row("Unique", "A", 100.0),
         ];
         assert!(group_duplicates(&rows).is_empty());
+    }
+
+    #[test]
+    fn duplicates_scan在真实迁移库上分组() {
+        use crate::db;
+        let conn = db::open_in_memory().unwrap();
+        conn.execute_batch(
+            "INSERT INTO folders(path) VALUES ('X');
+             INSERT INTO artists(id, name) VALUES (1, '宇多田ヒカル');
+             INSERT INTO tracks(path, folder_id, title, artist_id, duration_sec, size, created_at) VALUES
+               ('a.mp3', 1, 'First Love', 1, 254.0, 100, '2026-09-01 00:00:00'),
+               ('b.mp3', 1, 'first love', 1, 254.5, 120, '2026-09-02 00:00:00'),
+               ('c.mp3', 1, 'Other', 1, 100.0, 80, '2026-09-03 00:00:00');",
+        )
+        .unwrap();
+        let groups = scan_groups(&conn).unwrap();
+        assert_eq!(groups.len(), 1);
+        assert_eq!(groups[0].items.len(), 2);
+        // 保留候选 = 添加时间最早
+        assert_eq!(groups[0].items[0].track.path, "a.mp3");
+        assert_eq!(groups[0].items[0].size, 100.0);
     }
 
     #[test]
