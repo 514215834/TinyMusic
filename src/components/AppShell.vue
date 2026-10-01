@@ -278,7 +278,9 @@ async function importPlaylist() {
       <PlayerBar />
     </footer>
 
-    <NowPlaying v-if="player.nowPlayingOpen" />
+    <Transition name="np">
+      <NowPlaying v-if="player.nowPlayingOpen" />
+    </Transition>
   </div>
 </template>
 
@@ -485,16 +487,21 @@ async function importPlaylist() {
 
 .content {
   overflow: auto;
+  /* 滚动条占位恒定：进入不同模块不因滚动条出现/消失而抖动 */
+  scrollbar-gutter: stable;
   padding: 20px 24px 0;
   min-width: 0;
 }
 
-/* 路由切换过渡（细腻淡入上移，不阻塞交互） */
-.view-enter-active,
-.view-leave-active {
+/* 路由切换过渡：离场要快，入场淡入上移，避免空档感 */
+.view-enter-active {
   transition:
-    opacity 0.16s ease,
-    transform 0.16s ease;
+    opacity 0.18s ease,
+    transform 0.18s ease;
+}
+
+.view-leave-active {
+  transition: opacity 0.08s ease;
 }
 
 .view-enter-from {
@@ -504,6 +511,29 @@ async function importPlaylist() {
 
 .view-leave-to {
   opacity: 0;
+}
+
+/* 正在播放页：从播放栏"放大收下"的展开动效 */
+.np-enter-active {
+  transition:
+    opacity 0.28s ease,
+    transform 0.28s cubic-bezier(0.2, 0.9, 0.3, 1.1);
+}
+
+.np-leave-active {
+  transition:
+    opacity 0.18s ease,
+    transform 0.18s ease;
+}
+
+.np-enter-from {
+  opacity: 0;
+  transform: scale(1.06);
+}
+
+.np-leave-to {
+  opacity: 0;
+  transform: scale(1.02);
 }
 
 /* 固定悬浮播放栏：内容从其下方滚过，毛玻璃透出列表 */

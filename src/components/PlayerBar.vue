@@ -77,7 +77,9 @@ function toggleOverlay() {
         :key="player.currentTrack?.id ?? 'none'"
         :src="coverUrl"
         class="cover pop"
+        :title="t('player.nowPlaying')"
         alt="封面"
+        @click="player.currentTrack && player.toggleNowPlaying()"
       />
       <div v-else class="cover cover-empty"></div>
       <div class="meta">
@@ -195,10 +197,20 @@ function toggleOverlay() {
   border-radius: 8px;
   object-fit: cover;
   flex-shrink: 0;
+  cursor: pointer;
+  transition:
+    transform 0.18s ease,
+    box-shadow 0.18s ease;
+}
+
+.cover:hover {
+  transform: scale(1.06);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 55%, transparent);
 }
 
 .cover.pop {
-  animation: pop-in 0.35s cubic-bezier(0.2, 0.9, 0.3, 1.25) both;
+  /* backwards：动画结束后释放 transform，悬停缩放才能生效 */
+  animation: pop-in 0.35s cubic-bezier(0.2, 0.9, 0.3, 1.25) backwards;
 }
 
 .cover-empty {

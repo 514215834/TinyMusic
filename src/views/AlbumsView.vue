@@ -66,12 +66,15 @@ function open(album: AlbumInfo) {
 
 .wall {
   flex: 1;
+  min-height: 0;
   overflow: auto;
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
   gap: 16px;
   align-content: start;
-  padding: 4px;
+  /* 底部让位固定播放栏：最后一行可完整滚出；滚动条占位恒定防进入时抖动 */
+  padding: 4px 4px 88px;
+  scrollbar-gutter: stable;
 }
 
 .card {

@@ -223,6 +223,8 @@ function onTagSaved(updated: Track) {
   flex: 1;
   min-height: 0;
   overflow: auto;
+  /* 滚动条占位恒定：数据加载/视图切换不因滚动条出现而横向抖动 */
+  scrollbar-gutter: stable;
   border: 1px solid var(--border);
   border-radius: 12px;
   position: relative;

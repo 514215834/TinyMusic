@@ -58,12 +58,14 @@ function open(artist: ArtistInfo) {
 
 .wall {
   flex: 1;
+  min-height: 0;
   overflow: auto;
+  scrollbar-gutter: stable;
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
   gap: 16px;
   align-content: start;
-  padding: 4px;
+  padding: 4px 4px 88px;
 }
 
 .card {
