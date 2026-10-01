@@ -9,6 +9,10 @@ pub enum AppError {
     Io(#[from] std::io::Error),
     #[error("元数据解析失败: {0}")]
     Meta(#[from] lofty::error::FileParseError),
+    #[error("标签写入失败（文件可能只读或正被占用）: {0}")]
+    Encoding(#[from] lofty::error::FileEncodingError),
+    #[error("网络错误: {0}")]
+    Network(#[from] reqwest::Error),
     #[error("Tauri 错误: {0}")]
     Tauri(#[from] tauri::Error),
     #[error("JSON 错误: {0}")]

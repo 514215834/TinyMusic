@@ -16,6 +16,7 @@ export const commands = {
 	folderAdd: (path: string) => typedError<Folder, AppErrorDto>(__TAURI_INVOKE("folder_add", { path })),
 	folderList: () => typedError<Folder[], AppErrorDto>(__TAURI_INVOKE("folder_list")),
 	folderRemove: (id: number) => typedError<boolean, AppErrorDto>(__TAURI_INVOKE("folder_remove", { id })),
+	folderTracks: (folderId: number) => typedError<Track[], AppErrorDto>(__TAURI_INVOKE("folder_tracks", { folderId })),
 	historyAdd: (trackId: number) => typedError<null, AppErrorDto>(__TAURI_INVOKE("history_add", { trackId })),
 	libraryRescan: () => typedError<null, AppErrorDto>(__TAURI_INVOKE("library_rescan")),
 	lyricsGet: (trackId: number) => typedError<string | null, AppErrorDto>(__TAURI_INVOKE("lyrics_get", { trackId })),
@@ -40,9 +41,23 @@ export const commands = {
 	playlistRename: (id: number, name: string) => typedError<null, AppErrorDto>(__TAURI_INVOKE("playlist_rename", { id, name })),
 	playlistReorder: (id: number, trackIds: number[]) => typedError<number, AppErrorDto>(__TAURI_INVOKE("playlist_reorder", { id, trackIds })),
 	playlistTracks: (id: number) => typedError<Track[], AppErrorDto>(__TAURI_INVOKE("playlist_tracks", { id })),
+	scrapeAlbum: (albumId: number) => typedError<AlbumCandidate[], AppErrorDto>(__TAURI_INVOKE("scrape_album", { albumId })),
+	/**  应用专辑候选：封面入缓存 → albums.cover_file/year 更新 → 专辑内曲目的 year/genre 同步 */
+	scrapeApplyAlbum: (albumId: number, candidate: AlbumCandidate) => typedError<string | null, AppErrorDto>(__TAURI_INVOKE("scrape_apply_album", { albumId, candidate })),
+	/**  应用歌词候选：同步歌词优先；同名 .lrc 已存在时一并更新，保持两条通道一致 */
+	scrapeApplyLyrics: (trackId: number, candidate: LyricsCandidate) => typedError<null, AppErrorDto>(__TAURI_INVOKE("scrape_apply_lyrics", { trackId, candidate })),
+	/**  应用单曲候选：仅该曲目的封面（文本字段走标签编辑，职责分离） */
+	scrapeApplyTrack: (trackId: number, candidate: AlbumCandidate) => typedError<string, AppErrorDto>(__TAURI_INVOKE("scrape_apply_track", { trackId, candidate })),
+	scrapeLyrics: (trackId: number) => typedError<LyricsCandidate[], AppErrorDto>(__TAURI_INVOKE("scrape_lyrics", { trackId })),
+	scrapeTrack: (trackId: number) => typedError<AlbumCandidate[], AppErrorDto>(__TAURI_INVOKE("scrape_track", { trackId })),
 	searchTracks: (q: string, page: number | null, pageSize: number | null) => typedError<TrackPage, AppErrorDto>(__TAURI_INVOKE("search_tracks", { q, page, pageSize })),
 	settingsGet: (key: string) => typedError<string | null, AppErrorDto>(__TAURI_INVOKE("settings_get", { key })),
 	settingsSet: (key: string, value: string) => typedError<null, AppErrorDto>(__TAURI_INVOKE("settings_set", { key, value })),
+	smartPlaylistCreate: (name: string, rules: SmartRule[], trackLimit: number | null) => typedError<SmartPlaylist, AppErrorDto>(__TAURI_INVOKE("smart_playlist_create", { name, rules, trackLimit })),
+	smartPlaylistDelete: (id: number) => typedError<null, AppErrorDto>(__TAURI_INVOKE("smart_playlist_delete", { id })),
+	smartPlaylistList: () => typedError<SmartPlaylist[], AppErrorDto>(__TAURI_INVOKE("smart_playlist_list")),
+	smartPlaylistTracks: (id: number) => typedError<Track[], AppErrorDto>(__TAURI_INVOKE("smart_playlist_tracks", { id })),
+	smartPlaylistUpdate: (id: number, name: string, rules: SmartRule[], trackLimit: number | null) => typedError<null, AppErrorDto>(__TAURI_INVOKE("smart_playlist_update", { id, name, rules, trackLimit })),
 	/**
 	 *  主窗口 → Rust：转发播放状态给系统媒体浮层（SMTC）；
 	 *  非 Windows 平台为 no-op（本项目 Windows 优先，规范见技术设计文档 §6）
@@ -50,6 +65,7 @@ export const commands = {
 	smtcUpdate: (state: SmtcState) => typedError<null, AppErrorDto>(__TAURI_INVOKE("smtc_update", { state })),
 	historyRecent: (limit: number | null) => typedError<Track[], AppErrorDto>(__TAURI_INVOKE("history_recent", { limit })),
 	historyTop: (limit: number | null) => typedError<Track[], AppErrorDto>(__TAURI_INVOKE("history_top", { limit })),
+	tagUpdate: (trackId: number, patch: TagPatch) => typedError<Track, AppErrorDto>(__TAURI_INVOKE("tag_update", { trackId, patch })),
 	trackGet: (id: number) => typedError<{
 	id: number,
 	path: string,
@@ -68,6 +84,19 @@ export const commands = {
 };
 
 /* Types */
+/**  iTunes 刮削候选（专辑/单曲封面与专辑信息，iTunes Search API） */
+export type AlbumCandidate = {
+	/**  来源店面："itunes-jp" | "itunes-us"（J-Pop 优先 JP 店面，US 兜底） */
+	provider: string,
+	name: string,
+	artist: string,
+	year: number | null,
+	genre: string | null,
+	trackCount: number | null,
+	/**  高清封面 URL（artworkUrl100 替换为 1200x1200） */
+	artworkUrl: string | null,
+};
+
 /**  专辑卡片（封面墙用，含曲目数） */
 export type AlbumInfo = {
 	id: number,
@@ -97,6 +126,17 @@ export type Folder = {
 	path: string,
 };
 
+/**  LRCLIB 歌词候选（带完整文本，应用时整体回传落库） */
+export type LyricsCandidate = {
+	id: number,
+	trackName: string,
+	artistName: string,
+	durationSec: number | null,
+	instrumental: boolean,
+	syncedLyrics: string | null,
+	plainLyrics: string | null,
+};
+
 /**  歌单（侧边栏与歌单视图用） */
 export type Playlist = {
 	id: number,
@@ -112,6 +152,50 @@ export type PlaylistImport = {
 	skipped: number,
 };
 
+/**  智能歌单规则字段（功能设计文档 M4：五类规则） */
+export type SmartField = 
+/**  播放次数（play_history 聚合） */
+"playCount" | 
+/**  最近播放：最近 N 天内播过 */
+"lastPlayed" | 
+/**  流派（contains / equals） */
+"genre" | 
+/**  年份 */
+"year" | 
+/**  添加时间：最近 N 天内入库 */
+"addedAt";
+
+export type SmartOp = 
+/**  数值/年份 ≥ */
+"gte" | 
+/**  数值/年份 ≤ */
+"lte" | 
+/**  流派等于 */
+"eq" | 
+/**  流派包含 */
+"contains" | 
+/**  时间字段：最近 N 天内 */
+"withinDays";
+
+/**  智能歌单（列表实时生成：smart_playlist_tracks 每次按 rules 现算） */
+export type SmartPlaylist = {
+	id: number,
+	name: string,
+	rules: SmartRule[],
+	trackLimit: number | null,
+	trackCount: number,
+};
+
+/**  单条规则：field + op + 数值或文本（二选一，按 field 语义取用） */
+export type SmartRule = {
+	field: SmartField,
+	op: SmartOp,
+	/**  数值条件（playCount / year / withinDays 的天数） */
+	num: number | null,
+	/**  文本条件（genre） */
+	text: string | null,
+};
+
 /**  SMTC 转发载荷（主窗口 playerStore → Rust → 系统媒体浮层） */
 export type SmtcState = {
 	title: string,
@@ -120,6 +204,16 @@ export type SmtcState = {
 	positionSec: number | null,
 	durationSec: number | null,
 	coverFile: string | null,
+};
+
+/**  标签编辑（M4）：全字段整体提交，null = 清除该字段，写回源文件后同步曲库 */
+export type TagPatch = {
+	title: string,
+	artist: string | null,
+	album: string | null,
+	genre: string | null,
+	year: number | null,
+	trackNo: number | null,
 };
 
 export type Track = {

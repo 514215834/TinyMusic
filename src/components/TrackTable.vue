@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
-import { Heart, ListPlus, ListStart, Music, Play, X } from "lucide-vue-next";
-import type { Track } from "../services/library";
+import { Heart, ListPlus, ListStart, Music, Pencil, Play, X } from "lucide-vue-next";
+import { libraryApi, type Track } from "../services/library";
 import { useFavoritesStore } from "../stores/favorites";
 import { usePlayerStore } from "../stores/player";
 import { useCovers } from "../composables/useCovers";
 import { formatTime } from "../utils";
 import { t } from "../i18n";
+import TagEditorModal from "./TagEditorModal.vue";
+import ScrapeModal from "./ScrapeModal.vue";
 
 const props = withDefaults(
   defineProps<{
@@ -97,6 +99,23 @@ async function toggleFav(track: Track) {
 function isCurrent(track: Track) {
   return player.currentTrack?.id === track.id;
 }
+
+/* ---- 标签编辑与单曲刮削（M4）：就地更新行对象，所有视图同步刷新 ---- */
+const editingTrack = ref<Track | null>(null);
+const scrapingTrack = ref<Track | null>(null);
+
+async function onScrapeApplied(candidate: { artworkUrl?: string | null }) {
+  const track = scrapingTrack.value;
+  if (!track || !candidate.artworkUrl) return;
+  // apply_track 返回落库的封面缓存文件名，回填行对象（useCovers 按 coverFile 变化重解析）
+  const updated = await libraryApi.trackGet(track.id);
+  if (updated) track.coverFile = updated.coverFile;
+}
+
+/** 标签保存：就地更新行对象（列表与弹窗共享同一响应式引用，所有视图同步刷新） */
+function onTagSaved(updated: Track) {
+  Object.assign(editingTrack.value ?? updated, updated);
+}
 </script>
 
 <template>
@@ -168,6 +187,9 @@ function isCurrent(track: Track) {
           <button v-else class="act" :title="t('playlist.remove')" @click="emit('remove', track)">
             <X :size="14" />
           </button>
+          <button class="act" :title="t('tags.rowEdit')" @click="editingTrack = track">
+            <Pencil :size="14" />
+          </button>
         </span>
       </div>
     </div>
@@ -175,6 +197,24 @@ function isCurrent(track: Track) {
       <Music :size="24" />
       <span class="dim">{{ emptyText }}</span>
     </div>
+
+    <Teleport to="body">
+      <TagEditorModal
+        v-if="editingTrack"
+        :track="editingTrack"
+        @close="editingTrack = null"
+        @saved="onTagSaved"
+        @scrape="scrapingTrack = editingTrack"
+      />
+      <ScrapeModal
+        v-if="scrapingTrack"
+        mode="track"
+        :target-id="scrapingTrack.id"
+        :name="scrapingTrack.title"
+        @close="scrapingTrack = null"
+        @applied="onScrapeApplied"
+      />
+    </Teleport>
   </div>
 </template>
 
@@ -195,7 +235,7 @@ function isCurrent(track: Track) {
   display: grid;
   grid-template-columns:
     40px minmax(0, 1fr) minmax(90px, 160px) minmax(120px, 200px)
-    48px 76px;
+    48px 108px;
   gap: 8px;
   padding: 0 12px;
   align-items: center;

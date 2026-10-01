@@ -5,8 +5,10 @@ use tauri::{AppHandle, Manager, State};
 
 use crate::error::{AppError, AppErrorDto, AppResult};
 use crate::library;
-use crate::models::Folder;
+use crate::models::{Folder, Track};
 use crate::AppState;
+
+use super::tracks::{row_to_track, TRACK_SELECT};
 
 /// 剥离 canonicalize 产生的扩展路径前缀（\\?\ 与 \\?\UNC\），存储与 asset 协议统一用普通路径
 fn normalize_path(p: &Path) -> String {
@@ -95,6 +97,26 @@ fn remove_folder(state: &AppState, id: i32) -> AppResult<bool> {
 #[specta::specta]
 pub async fn folder_remove(state: State<'_, AppState>, id: i32) -> Result<bool, AppErrorDto> {
     remove_folder(&state, id).map_err(AppErrorDto::from)
+}
+
+/// 文件夹视图（M4）：某来源目录下的全部曲目（含子目录），按路径排序呈现目录结构
+fn folder_track_list(state: &AppState, folder_id: i32) -> AppResult<Vec<Track>> {
+    let conn = state.conn.lock();
+    let sql = format!("{TRACK_SELECT} WHERE t.folder_id = ?1 ORDER BY t.path");
+    let mut stmt = conn.prepare(&sql)?;
+    let items = stmt
+        .query_map(params![i64::from(folder_id)], row_to_track)?
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(items)
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn folder_tracks(
+    state: State<'_, AppState>,
+    folder_id: i32,
+) -> Result<Vec<Track>, AppErrorDto> {
+    folder_track_list(&state, folder_id).map_err(AppErrorDto::from)
 }
 
 #[cfg(test)]

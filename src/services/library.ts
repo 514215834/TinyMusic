@@ -3,6 +3,7 @@ import {
   type AlbumInfo,
   type ArtistInfo,
   type Folder,
+  type TagPatch,
   type Track,
   type TrackPage,
 } from "../bindings";
@@ -26,12 +27,16 @@ export const libraryApi = {
   artistsQuery: async () => unwrap(await commands.artistsQuery()),
   albumTracks: async (albumId: number) => unwrap(await commands.albumTracks(albumId)),
   artistTracks: async (artistId: number) => unwrap(await commands.artistTracks(artistId)),
+  folderTracks: async (folderId: number) => unwrap(await commands.folderTracks(folderId)),
   favoritesList: async () => unwrap(await commands.favoritesList()),
   favoritesIds: async () => unwrap(await commands.favoritesIds()),
   favoriteToggle: async (trackId: number) => unwrap(await commands.favoriteToggle(trackId)),
   historyAdd: async (trackId: number) => unwrap(await commands.historyAdd(trackId)),
   lyricsGet: async (trackId: number) => unwrap(await commands.lyricsGet(trackId)),
   coverPath: async (file: string) => unwrap(await commands.coverPath(file)),
+  /** 标签编辑（M4）：写回源文件并同步曲库，返回更新后的曲目 */
+  tagUpdate: async (trackId: number, patch: TagPatch) =>
+    unwrap(await commands.tagUpdate(trackId, patch)),
 };
 
 /** cover_file（缓存文件名）→ asset 协议 URL；无封面返回 null */

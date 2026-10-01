@@ -1,6 +1,7 @@
 pub(crate) mod covers;
 mod metadata;
 pub mod m3u8;
+pub mod scrape;
 pub mod scanner;
 pub mod watcher;
 

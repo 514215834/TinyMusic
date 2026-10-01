@@ -4,6 +4,7 @@ import { useRouter } from "vue-router";
 import { open } from "@tauri-apps/plugin-dialog";
 import {
   Disc3,
+  Folder,
   Heart,
   History,
   Library,
@@ -11,11 +12,13 @@ import {
   Pencil,
   Plus,
   Settings,
+  Sparkles,
   Trash2,
   Upload,
   User,
 } from "lucide-vue-next";
 import { playlistsApi, type Playlist } from "../services/playlists";
+import { smartApi, type SmartPlaylist } from "../services/smartPlaylists";
 import { useKeyboardShortcuts } from "../composables/useKeyboardShortcuts";
 import { usePlayerStore } from "../stores/player";
 import { useSettingsStore } from "../stores/settings";
@@ -31,11 +34,21 @@ const settings = useSettingsStore();
 void settings.load();
 
 const playlists = ref<Playlist[]>([]);
+const smartPlaylists = ref<SmartPlaylist[]>([]);
 
-onMounted(loadPlaylists);
+onMounted(loadAll);
 
-async function loadPlaylists() {
-  playlists.value = await playlistsApi.list();
+async function loadAll() {
+  const [pls, smarts] = await Promise.all([playlistsApi.list(), smartApi.list()]);
+  playlists.value = pls;
+  smartPlaylists.value = smarts;
+}
+
+/** 智能歌单：+ 直接创建（默认规则=播放≥1次），跳转后规则可改 */
+async function createSmart() {
+  const created = await smartApi.create(t("smart.defaultName"), [{ field: "playCount", op: "gte", num: 1, text: null }], null);
+  await loadAll();
+  void router.push({ name: "smart-playlist", params: { id: created.id } });
 }
 
 /* 新建歌单：行内输入 */
@@ -53,7 +66,7 @@ async function confirmCreate() {
   const name = newName.value.trim();
   if (name) await playlistsApi.create(name);
   creating.value = false;
-  await loadPlaylists();
+  await loadAll();
 }
 
 /* 重命名歌单：行内输入 */
@@ -73,12 +86,23 @@ async function confirmRename() {
     if (name) await playlistsApi.rename(renamingId.value, name);
   }
   renamingId.value = null;
-  await loadPlaylists();
+  await loadAll();
 }
 
 async function remove(p: Playlist) {
   await playlistsApi.remove(p.id);
-  await loadPlaylists();
+  await loadAll();
+}
+
+async function removeSmart(s: SmartPlaylist) {
+  await smartApi.remove(s.id);
+  await loadAll();
+  if (
+    router.currentRoute.value.name === "smart-playlist" &&
+    Number(router.currentRoute.value.params.id) === s.id
+  ) {
+    void router.push({ name: "library" });
+  }
 }
 
 /* M3：从 M3U8 导入为新歌单（曲库中未命中的路径自动跳过，结果由后端返回） */
@@ -98,7 +122,7 @@ async function importPlaylist() {
   if (typeof selected !== "string") return;
   try {
     const result = await playlistsApi.importM3u8(selected, playlistNameFromPath(selected));
-    await loadPlaylists();
+    await loadAll();
     void router.push({ name: "playlist", params: { id: result.playlistId } });
   } catch (e) {
     importError.value = String(e instanceof Error ? e.message : e);
@@ -122,6 +146,10 @@ async function importPlaylist() {
         <RouterLink class="nav-item" :to="{ name: 'artists' }">
           <User :size="16" />
           {{ t("nav.artists") }}
+        </RouterLink>
+        <RouterLink class="nav-item" :to="{ name: 'folders' }">
+          <Folder :size="16" />
+          {{ t("nav.folders") }}
         </RouterLink>
         <RouterLink class="nav-item" :to="{ name: 'favorites' }">
           <Heart :size="16" />
@@ -201,6 +229,39 @@ async function importPlaylist() {
         </RouterLink>
         <div v-if="!playlists.length && !creating" class="pl-empty dim">
           {{ t("sidebar.emptyPlaylists") }}
+        </div>
+      </nav>
+
+      <div class="playlists-head">
+        <span class="playlists-title dim">{{ t("sidebar.smartPlaylists") }}</span>
+        <button class="pl-add" :title="t('smart.addTip')" @click="createSmart">
+          <Plus :size="13" />
+        </button>
+      </div>
+
+      <nav class="pl-list">
+        <RouterLink
+          v-for="s in smartPlaylists"
+          :key="s.id"
+          class="pl-item"
+          :to="{ name: 'smart-playlist', params: { id: s.id } }"
+          :title="s.name"
+        >
+          <Sparkles :size="14" />
+          <span class="pl-name">{{ s.name }}</span>
+          <span class="pl-count dim">{{ s.trackCount }}</span>
+          <span class="pl-actions">
+            <button
+              class="pl-btn"
+              :title="t('sidebar.deletePlaylist')"
+              @click.prevent="removeSmart(s)"
+            >
+              <Trash2 :size="12" />
+            </button>
+          </span>
+        </RouterLink>
+        <div v-if="!smartPlaylists.length" class="pl-empty dim">
+          {{ t("sidebar.emptySmart") }}
         </div>
       </nav>
     </aside>
@@ -360,6 +421,11 @@ async function importPlaylist() {
 
 .pl-item:hover .pl-actions {
   display: inline-flex;
+}
+
+.pl-count {
+  font-size: 11px;
+  flex-shrink: 0;
 }
 
 .pl-btn {

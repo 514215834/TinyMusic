@@ -29,6 +29,11 @@ const router = createRouter({
           component: () => import("../views/ArtistDetailView.vue"),
         },
         {
+          path: "folders/:id?",
+          name: "folders",
+          component: () => import("../views/FolderView.vue"),
+        },
+        {
           path: "favorites",
           name: "favorites",
           component: () => import("../views/FavoritesView.vue"),
@@ -42,6 +47,11 @@ const router = createRouter({
           path: "playlists/:id",
           name: "playlist",
           component: () => import("../views/PlaylistView.vue"),
+        },
+        {
+          path: "smart/:id",
+          name: "smart-playlist",
+          component: () => import("../views/SmartPlaylistView.vue"),
         },
         {
           path: "settings",

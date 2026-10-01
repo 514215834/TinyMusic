@@ -103,3 +103,97 @@ pub struct SmtcState {
     pub duration_sec: f64,
     pub cover_file: Option<String>,
 }
+
+/// 智能歌单规则字段（功能设计文档 M4：五类规则）
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub enum SmartField {
+    /// 播放次数（play_history 聚合）
+    PlayCount,
+    /// 最近播放：最近 N 天内播过
+    LastPlayed,
+    /// 流派（contains / equals）
+    Genre,
+    /// 年份
+    Year,
+    /// 添加时间：最近 N 天内入库
+    AddedAt,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub enum SmartOp {
+    /// 数值/年份 ≥
+    Gte,
+    /// 数值/年份 ≤
+    Lte,
+    /// 流派等于
+    Eq,
+    /// 流派包含
+    Contains,
+    /// 时间字段：最近 N 天内
+    WithinDays,
+}
+
+/// 单条规则：field + op + 数值或文本（二选一，按 field 语义取用）
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub struct SmartRule {
+    pub field: SmartField,
+    pub op: SmartOp,
+    /// 数值条件（playCount / year / withinDays 的天数）
+    pub num: Option<f64>,
+    /// 文本条件（genre）
+    pub text: Option<String>,
+}
+
+/// 智能歌单（列表实时生成：smart_playlist_tracks 每次按 rules 现算）
+#[derive(Debug, Clone, Serialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub struct SmartPlaylist {
+    pub id: i32,
+    pub name: String,
+    pub rules: Vec<SmartRule>,
+    pub track_limit: Option<i32>,
+    pub track_count: i32,
+}
+
+/// 标签编辑（M4）：全字段整体提交，null = 清除该字段，写回源文件后同步曲库
+#[derive(Debug, Clone, Deserialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub struct TagPatch {
+    pub title: String,
+    pub artist: Option<String>,
+    pub album: Option<String>,
+    pub genre: Option<String>,
+    pub year: Option<i32>,
+    pub track_no: Option<i32>,
+}
+
+/// iTunes 刮削候选（专辑/单曲封面与专辑信息，iTunes Search API）
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub struct AlbumCandidate {
+    /// 来源店面："itunes-jp" | "itunes-us"（J-Pop 优先 JP 店面，US 兜底）
+    pub provider: String,
+    pub name: String,
+    pub artist: String,
+    pub year: Option<i32>,
+    pub genre: Option<String>,
+    pub track_count: Option<i32>,
+    /// 高清封面 URL（artworkUrl100 替换为 1200x1200）
+    pub artwork_url: Option<String>,
+}
+
+/// LRCLIB 歌词候选（带完整文本，应用时整体回传落库）
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub struct LyricsCandidate {
+    pub id: i32,
+    pub track_name: String,
+    pub artist_name: String,
+    pub duration_sec: Option<f64>,
+    pub instrumental: bool,
+    pub synced_lyrics: Option<String>,
+    pub plain_lyrics: Option<String>,
+}

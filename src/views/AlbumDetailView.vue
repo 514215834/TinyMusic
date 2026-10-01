@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { onMounted, ref, watch } from "vue";
 import { useRoute } from "vue-router";
-import { Disc3 } from "lucide-vue-next";
+import { Disc3, Globe } from "lucide-vue-next";
 import TrackTable from "../components/TrackTable.vue";
+import ScrapeModal from "../components/ScrapeModal.vue";
 import { coverUrl, libraryApi, type AlbumInfo, type Track } from "../services/library";
 import { t } from "../i18n";
 
@@ -10,6 +11,7 @@ const route = useRoute();
 const album = ref<AlbumInfo | null>(null);
 const tracks = ref<Track[]>([]);
 const cover = ref<string | null>(null);
+const scraping = ref(false);
 
 async function load(id: number) {
   album.value = null;
@@ -43,9 +45,24 @@ watch(
           <template v-if="album?.year"> · {{ album.year }}</template>
           · {{ t("albums.trackCount", { n: tracks.length }) }}
         </div>
+        <button v-if="album" class="scrape-btn" @click="scraping = true">
+          <Globe :size="13" />
+          {{ t("scrape.albumAction") }}
+        </button>
       </div>
     </header>
     <TrackTable :tracks="tracks" :empty-text="t('table.empty')" />
+
+    <Teleport to="body">
+      <ScrapeModal
+        v-if="scraping && album"
+        mode="album"
+        :target-id="album.id"
+        :name="album.name"
+        @close="scraping = false"
+        @applied="() => void load(album!.id)"
+      />
+    </Teleport>
   </section>
 </template>
 
@@ -86,5 +103,28 @@ watch(
 .head h2 {
   margin: 0 0 6px;
   font-size: 20px;
+}
+
+.scrape-btn {
+  margin-top: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-elev);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.scrape-btn svg {
+  display: block;
+}
+
+.scrape-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
 }
 </style>

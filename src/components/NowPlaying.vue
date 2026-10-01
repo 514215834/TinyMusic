@@ -1,17 +1,19 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
-import { ChevronDown, Music } from "lucide-vue-next";
+import { ChevronDown, Music, TextSearch } from "lucide-vue-next";
 import { coverUrl, libraryApi } from "../services/library";
 import { usePlayerStore } from "../stores/player";
 import { activeLrcIndex, parseLrc, type LrcLine } from "../utils/lrc";
 import { formatTime } from "../utils";
 import { t } from "../i18n";
+import LyricsScrapeModal from "./LyricsScrapeModal.vue";
 
 const player = usePlayerStore();
 const cover = ref<string | null>(null);
 const lyrics = ref<LrcLine[]>([]);
 const activeIdx = ref(-1);
 const lyricBox = ref<HTMLElement | null>(null);
+const lyricsScraping = ref(false);
 
 let rafId = 0;
 let coverToken = 0;
@@ -86,6 +88,14 @@ function seekTo(line: LrcLine) {
     <button class="collapse" :title="t('common.close')" @click="player.toggleNowPlaying()">
       <ChevronDown :size="18" />
     </button>
+    <button
+      v-if="player.currentTrack"
+      class="collapse lyrics-scrape"
+      :title="t('scrape.lyricsAction')"
+      @click="lyricsScraping = true"
+    >
+      <TextSearch :size="16" />
+    </button>
 
     <div class="stage">
       <div class="cover-wrap">
@@ -113,6 +123,16 @@ function seekTo(line: LrcLine) {
       </template>
       <div v-else class="no-lyrics dim">{{ t("player.noLyrics") }}</div>
     </div>
+
+    <Teleport to="body">
+      <LyricsScrapeModal
+        v-if="lyricsScraping && player.currentTrack"
+        :track-id="player.currentTrack.id"
+        :name="player.currentTrack.title"
+        @close="lyricsScraping = false"
+        @applied="() => void loadLyrics()"
+      />
+    </Teleport>
 
     <div class="controls">
       <span class="time dim">{{ formatTime(player.positionSec) }}</span>
@@ -164,6 +184,11 @@ function seekTo(line: LrcLine) {
 
 .collapse:hover {
   color: var(--text);
+}
+
+.lyrics-scrape {
+  top: 16px;
+  right: 60px;
 }
 
 .stage {
