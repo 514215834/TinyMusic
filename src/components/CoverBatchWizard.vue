@@ -377,13 +377,17 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown));
   overflow: auto;
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  /* 固定行高：aspect-ratio 用在 grid 子项上时行高与拉伸高度互相打架（Chromium
+     行高贡献按内容回落，格子比行高 → 行间重叠溢出），固定行高根治 */
+  grid-auto-rows: 132px;
   gap: 10px;
   align-content: start;
 }
 
 .cand {
   position: relative;
-  aspect-ratio: 1;
+  width: 100%;
+  height: 100%;
   border: 2px solid transparent;
   border-radius: 10px;
   background: var(--bg-hover);
