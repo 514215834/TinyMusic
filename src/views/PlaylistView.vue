@@ -139,7 +139,7 @@ async function exportPlaylist() {
   border: 1px solid var(--accent);
   border-radius: 8px;
   background: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
   cursor: pointer;
   display: inline-flex;
   align-items: center;

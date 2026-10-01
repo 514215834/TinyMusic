@@ -96,7 +96,7 @@ onMounted(load);
 
 .segment button.active {
   background: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
 }
 
 .loading {

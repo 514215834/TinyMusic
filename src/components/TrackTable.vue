@@ -475,7 +475,7 @@ function onTagSaved(updated: Track) {
 }
 
 .act.on {
-  color: var(--accent);
+  color: var(--heart);
 }
 
 .empty {

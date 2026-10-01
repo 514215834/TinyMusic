@@ -279,7 +279,7 @@ function toggleOverlay() {
   width: 42px;
   height: 42px;
   background: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
   box-shadow: 0 4px 14px color-mix(in srgb, var(--accent) 45%, transparent);
 }
 

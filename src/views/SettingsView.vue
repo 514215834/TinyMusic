@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { useSettingsStore, type ThemeChoice } from "../stores/settings";
 import { usePlayerStore, EQ_FREQS, EQ_MIN, EQ_MAX } from "../stores/player";
 import { overlayApi } from "../services/overlay";
@@ -19,6 +19,25 @@ const locales: { value: Locale; label: string }[] = [
   { value: "zh", label: "中文" },
   { value: "en", label: "English" },
 ];
+
+/** 预设主题色板：首项为内置默认（accent=""，恢复默认），其余为常用强调色 */
+const ACCENT_PRESETS: { color: string; labelKey: string }[] = [
+  { color: "", labelKey: "settings.accentDefault" },
+  { color: "#3b82f6", labelKey: "" },
+  { color: "#6366f1", labelKey: "" },
+  { color: "#8b5cf6", labelKey: "" },
+  { color: "#ec4899", labelKey: "" },
+  { color: "#ef4444", labelKey: "" },
+  { color: "#f97316", labelKey: "" },
+  { color: "#10b981", labelKey: "" },
+  { color: "#14b8a6", labelKey: "" },
+];
+
+/** 取色器镜像值（原生控件要求 #rrggbb；未自定义时以默认色为起点） */
+const customColor = computed({
+  get: () => (settings.accent ? settings.accent : "#3b82f6"),
+  set: (v: string) => settings.setAccent(v),
+});
 
 /* 透明度滑杆与快捷键输入的本地镜像，change（松手/回车）时下发并持久化 */
 const opacity = ref(0.6);
@@ -123,6 +142,35 @@ function freqLabel(freq: number) {
           </button>
         </div>
       </div>
+      <div class="row">
+        <span>{{ t("settings.accentColor") }}</span>
+        <div class="accent-row">
+          <button
+            v-for="p in ACCENT_PRESETS"
+            :key="p.color || 'default'"
+            class="swatch"
+            :class="{ active: settings.accent === p.color }"
+            :style="{ background: p.color || 'linear-gradient(135deg, #60a5fa, #ec4899)' }"
+            :title="p.labelKey ? t(p.labelKey) : p.color"
+            @click="settings.setAccent(p.color)"
+          ></button>
+          <label class="custom-swatch" :title="t('settings.accentCustom')">
+            <input v-model="customColor" type="color" />
+            <span class="dim">{{ t("settings.accentCustom") }}</span>
+          </label>
+        </div>
+      </div>
+      <div class="row">
+        <span :title="t('settings.ambientHint')">{{ t("settings.ambient") }}</span>
+        <div class="segment">
+          <button :class="{ active: settings.ambient }" @click="settings.setAmbient(true)">
+            {{ t("common.on") }}
+          </button>
+          <button :class="{ active: !settings.ambient }" @click="settings.setAmbient(false)">
+            {{ t("common.off") }}
+          </button>
+        </div>
+      </div>
     </div>
 
     <div class="group">
@@ -209,7 +257,7 @@ function freqLabel(freq: number) {
       <div class="group-title dim">{{ t("settings.about") }}</div>
       <div class="row">
         <span>{{ t("settings.aboutDesc") }}</span>
-        <span class="dim">v0.4.0-dev</span>
+        <span class="dim">v0.5.0</span>
       </div>
     </div>
   </section>
@@ -270,7 +318,55 @@ function freqLabel(freq: number) {
 
 .segment button.active {
   background: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
+}
+
+.accent-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.swatch {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: 50%;
+  cursor: pointer;
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.swatch:hover {
+  transform: scale(1.12);
+}
+
+.swatch.active {
+  box-shadow:
+    0 0 0 2px var(--bg),
+    0 0 0 4px var(--accent);
+}
+
+.custom-swatch {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.custom-swatch input[type="color"] {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: none;
+  cursor: pointer;
 }
 
 .opacity-row {

@@ -7,6 +7,10 @@
   --text: #1a1a1a;
   --text-dim: #6b7280;
   --accent: #3b82f6;
+  /* 强调色背景上的文字：自定义主题色时由 settings store 按对比度重算（WCAG 亮度） */
+  --on-accent: #ffffff;
+  /* 语义色：收藏红心（不随主题色变化） */
+  --heart: #ef4444;
   --overlay-bg: rgba(20, 20, 20, 0.55);
 }
 

@@ -3,12 +3,14 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { ChevronDown, Music, TextSearch } from "lucide-vue-next";
 import { coverUrl, libraryApi } from "../services/library";
 import { usePlayerStore } from "../stores/player";
+import { useSettingsStore } from "../stores/settings";
 import { activeLrcIndex, parseLrc, type LrcLine } from "../utils/lrc";
 import { formatTime } from "../utils";
 import { t } from "../i18n";
 import LyricsScrapeModal from "./LyricsScrapeModal.vue";
 
 const player = usePlayerStore();
+const settings = useSettingsStore();
 const cover = ref<string | null>(null);
 const lyrics = ref<LrcLine[]>([]);
 const activeIdx = ref(-1);
@@ -85,9 +87,13 @@ function seekTo(line: LrcLine) {
 
 <template>
   <div class="now-playing">
-    <!-- 毛玻璃氛围层：当前封面大尺寸模糊铺底（无封面时退回纯色） -->
-    <div class="bg-blur" :class="{ on: cover }" :style="cover ? { backgroundImage: `url(${cover})` } : undefined"></div>
-    <div class="bg-tint"></div>
+    <!-- 毛玻璃氛围层：当前封面大尺寸模糊铺底（设置可关闭，无封面时退回纯色） -->
+    <div
+      v-if="settings.ambient && cover"
+      class="bg-blur on"
+      :style="{ backgroundImage: `url(${cover})` }"
+    ></div>
+    <div v-if="settings.ambient" class="bg-tint"></div>
 
     <button class="collapse" :title="t('common.close')" @click="player.toggleNowPlaying()">
       <ChevronDown :size="18" />
