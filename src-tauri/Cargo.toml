@@ -1,6 +1,6 @@
 [package]
 name = "tinymusic"
-version = "0.5.0"
+version = "0.6.0"
 description = "TinyMusic - 极简本地桌面音乐播放器"
 authors = ["jinfenglong"]
 edition = "2021"

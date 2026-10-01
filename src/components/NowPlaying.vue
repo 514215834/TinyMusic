@@ -4,7 +4,7 @@ import { ChevronDown, Music, TextSearch } from "lucide-vue-next";
 import { coverUrl, libraryApi } from "../services/library";
 import { usePlayerStore } from "../stores/player";
 import { useSettingsStore } from "../stores/settings";
-import { activeLrcIndex, parseLrc, type LrcLine } from "../utils/lrc";
+import { activeLrcIndex, activeWordIndex, parseLrc, type LrcLine, type LrcWord } from "../utils/lrc";
 import { formatTime } from "../utils";
 import { t } from "../i18n";
 import LyricsScrapeModal from "./LyricsScrapeModal.vue";
@@ -14,6 +14,8 @@ const settings = useSettingsStore();
 const cover = ref<string | null>(null);
 const lyrics = ref<LrcLine[]>([]);
 const activeIdx = ref(-1);
+/** 当前行的逐字高亮索引（M5 卡拉OK；无字级标签行恒 -1，回退逐行滚动） */
+const activeWordIdx = ref(-1);
 const lyricBox = ref<HTMLElement | null>(null);
 const lyricsScraping = ref(false);
 
@@ -33,6 +35,7 @@ async function loadCover() {
 async function loadLyrics() {
   lyrics.value = [];
   activeIdx.value = -1;
+  activeWordIdx.value = -1;
   const id = player.currentTrack?.id;
   if (id == null) return;
   try {
@@ -60,6 +63,10 @@ function tick() {
         }
       }
     }
+    // M5 逐字同步：rAF 直读引擎时间（偏差远小于 200ms 验收）
+    const words = lyrics.value[idx]?.words;
+    const wIdx = words ? activeWordIndex(words, timeMs) : -1;
+    if (wIdx !== activeWordIdx.value) activeWordIdx.value = wIdx;
   }
   rafId = requestAnimationFrame(tick);
 }
@@ -82,6 +89,11 @@ watch(
 
 function seekTo(line: LrcLine) {
   if (line.text && line.timeMs >= 0) player.seek(line.timeMs / 1000);
+}
+
+/** 逐字行点击字词跳转到该字时间（M5 卡拉OK） */
+function seekToWord(word: LrcWord) {
+  if (word.timeMs >= 0) player.seek(word.timeMs / 1000);
 }
 </script>
 
@@ -128,7 +140,20 @@ function seekTo(line: LrcLine) {
           :data-line="i"
           @click="seekTo(line)"
         >
-          {{ line.text || "···" }}
+          <template v-if="line.words">
+            <span
+              v-for="(w, wi) in line.words"
+              :key="wi"
+              class="word"
+              :class="{
+                sung: i === activeIdx && wi <= activeWordIdx,
+                now: i === activeIdx && wi === activeWordIdx,
+              }"
+              @click.stop="seekToWord(w)"
+              >{{ w.text }}</span
+            >
+          </template>
+          <template v-else>{{ line.text || "···" }}</template>
         </div>
       </template>
       <div v-else class="no-lyrics dim">{{ t("player.noLyrics") }}</div>
@@ -327,6 +352,26 @@ function seekTo(line: LrcLine) {
 .line.empty {
   cursor: default;
   opacity: 0.4;
+}
+
+/* M5 卡拉OK逐字高亮：已唱字词提亮，当前字词强调色 + 辉光；未唱保持暗色 */
+.line.active .word {
+  color: var(--text-dim);
+}
+
+.word {
+  transition:
+    color 0.12s ease,
+    text-shadow 0.12s ease;
+}
+
+.line.active .word.sung {
+  color: var(--text);
+}
+
+.line.active .word.now {
+  color: var(--accent);
+  text-shadow: 0 0 14px color-mix(in srgb, var(--accent) 55%, transparent);
 }
 
 .no-lyrics {

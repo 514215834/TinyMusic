@@ -257,7 +257,7 @@ function freqLabel(freq: number) {
       <div class="group-title dim">{{ t("settings.about") }}</div>
       <div class="row">
         <span>{{ t("settings.aboutDesc") }}</span>
-        <span class="dim">v0.5.0</span>
+        <span class="dim">v0.6.0</span>
       </div>
     </div>
   </section>
@@ -269,6 +269,8 @@ function freqLabel(freq: number) {
   display: flex;
   flex-direction: column;
   gap: 20px;
+  /* 页面在 .content 内直接滚动：底部让位固定播放栏，末组不被遮挡 */
+  padding-bottom: 96px;
 }
 
 .toolbar h2 {
