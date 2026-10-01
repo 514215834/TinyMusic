@@ -8,6 +8,7 @@ import { t } from "../i18n";
 /**
  * 一键播放整个列表：传入现成数组（专辑/歌单/文件夹等），
  * 或传 load()（曲库视图按需拉全量）。
+ * 首曲立即播放，其余整表自动加入播放队列（面板可见、可管理）。
  */
 const props = defineProps<{ tracks?: Track[]; load?: () => Promise<Track[]> }>();
 const player = usePlayerStore();
@@ -18,7 +19,7 @@ async function onClick() {
   busy.value = true;
   try {
     const list = props.tracks ?? (props.load ? await props.load() : []);
-    if (list.length) player.play(list, 0);
+    if (list.length) player.playAll(list);
   } finally {
     busy.value = false;
   }

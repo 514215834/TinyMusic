@@ -252,6 +252,28 @@ export const usePlayerStore = defineStore("player", () => {
     playAt(index);
   }
 
+  /**
+   * 播放全部（PlayAllButton）：首曲立即播放，其余整表自动加入队列——
+   * 手动队列即待播序列（面板可见、可移除/拖拽重排/清空），next() 天然按此消耗。
+   * 随机模式下对入队部分预洗牌，保证消耗顺序即随机顺序。
+   */
+  function playAll(tracks: Track[]) {
+    if (!tracks.length) return;
+    const [first, ...rest] = tracks;
+    queue.value = tracks;
+    userQueue.value = mode.value === "shuffle" ? shuffleSlice(rest) : rest;
+    if (first) playTrack(first);
+  }
+
+  function shuffleSlice(arr: Track[]): Track[] {
+    const out = [...arr];
+    for (let i = out.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [out[i], out[j]] = [out[j]!, out[i]!];
+    }
+    return out;
+  }
+
   /** 下一首播放：插入手动队列队首（当前曲目播完立即播放） */
   function playNext(track: Track) {
     userQueue.value.unshift(track);
@@ -268,6 +290,10 @@ export const usePlayerStore = defineStore("player", () => {
 
   function clearUserQueue() {
     userQueue.value = [];
+    // 清空 = 播完当前即停：截断上下文队列中当前曲目之后的部分，
+    // 避免 next() 回落到索引续播把已"清空"的曲目重新播出来（prev 回退不受影响）
+    const idx = queue.value.findIndex((t) => t.id === currentTrack.value?.id);
+    if (idx >= 0) queue.value = queue.value.slice(0, idx + 1);
   }
 
   /** 拖拽重排手动队列 */
@@ -539,6 +565,7 @@ export const usePlayerStore = defineStore("player", () => {
     eqGains,
     outputDeviceId,
     play,
+    playAll,
     playNext,
     addToQueue,
     removeFromQueue,
