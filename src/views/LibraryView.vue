@@ -3,6 +3,7 @@ import { computed, onMounted, ref, watch } from "vue";
 import { open } from "@tauri-apps/plugin-dialog";
 import { Folder, FolderPlus, RefreshCw, Search, X } from "lucide-vue-next";
 import TrackTable from "../components/TrackTable.vue";
+import PlayAllButton from "../components/PlayAllButton.vue";
 import { useLibraryStore } from "../stores/library";
 import { libraryApi, type Track } from "../services/library";
 import { t } from "../i18n";
@@ -79,6 +80,7 @@ function folderName(path: string) {
           <X :size="12" />
         </button>
       </div>
+      <PlayAllButton :load="() => libraryApi.tracksAll()" />
       <button @click="library.rescan()">
         <RefreshCw :size="14" />
         {{ t("library.rescan") }}

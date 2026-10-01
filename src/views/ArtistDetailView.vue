@@ -3,6 +3,7 @@ import { onMounted, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 import { User } from "lucide-vue-next";
 import TrackTable from "../components/TrackTable.vue";
+import PlayAllButton from "../components/PlayAllButton.vue";
 import { libraryApi, type ArtistInfo, type Track } from "../services/library";
 import { t } from "../i18n";
 
@@ -44,6 +45,8 @@ watch(
           }}
         </div>
       </div>
+      <div class="spacer"></div>
+      <PlayAllButton :tracks="tracks" />
     </header>
     <TrackTable :tracks="tracks" :empty-text="t('table.empty')" />
   </section>
@@ -55,6 +58,10 @@ watch(
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+
+.spacer {
+  flex: 1;
 }
 
 .head {

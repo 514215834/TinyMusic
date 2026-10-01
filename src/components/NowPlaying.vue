@@ -85,6 +85,10 @@ function seekTo(line: LrcLine) {
 
 <template>
   <div class="now-playing">
+    <!-- 毛玻璃氛围层：当前封面大尺寸模糊铺底（无封面时退回纯色） -->
+    <div class="bg-blur" :class="{ on: cover }" :style="cover ? { backgroundImage: `url(${cover})` } : undefined"></div>
+    <div class="bg-tint"></div>
+
     <button class="collapse" :title="t('common.close')" @click="player.toggleNowPlaying()">
       <ChevronDown :size="18" />
     </button>
@@ -99,7 +103,7 @@ function seekTo(line: LrcLine) {
 
     <div class="stage">
       <div class="cover-wrap">
-        <img v-if="cover" :src="cover" alt="" />
+        <img v-if="cover" :key="cover" :src="cover" alt="" />
         <Music v-else :size="72" :stroke-width="1.2" />
       </div>
       <div class="meta">
@@ -151,21 +155,48 @@ function seekTo(line: LrcLine) {
 </template>
 
 <style scoped>
+/* 三行网格：封面区(自适应) / 歌词区(有界滚动) / 控制区 —— 歌词永不侵入封面 */
 .now-playing {
   position: fixed;
   inset: 0;
   z-index: 200;
   display: grid;
-  grid-template-rows: 1fr auto auto;
-  gap: 20px;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: 12px;
   padding: 32px 48px 24px;
+  overflow: hidden;
   background: var(--bg);
+}
+
+/* 毛玻璃氛围：封面模糊铺底 + 暗色压层保证前景对比度 */
+.bg-blur {
+  position: absolute;
+  inset: -60px;
+  background-size: cover;
+  background-position: center;
+  filter: blur(90px) saturate(1.5);
+  transform: scale(1.15);
+  opacity: 0;
+  transition: opacity 0.6s ease;
+  pointer-events: none;
+}
+
+.bg-blur.on {
+  opacity: 0.9;
+}
+
+.bg-tint {
+  position: absolute;
+  inset: 0;
+  background: color-mix(in srgb, var(--bg) 45%, transparent);
+  pointer-events: none;
 }
 
 .collapse {
   position: absolute;
   top: 16px;
   right: 16px;
+  z-index: 2;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -173,9 +204,14 @@ function seekTo(line: LrcLine) {
   height: 34px;
   border: 1px solid var(--border);
   border-radius: 50%;
-  background: var(--bg-elev);
-  color: var(--text-dim);
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  color: var(--text);
   cursor: pointer;
+  transition:
+    background-color 0.15s ease,
+    transform 0.12s ease;
 }
 
 .collapse svg {
@@ -183,7 +219,11 @@ function seekTo(line: LrcLine) {
 }
 
 .collapse:hover {
-  color: var(--text);
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.collapse:active {
+  transform: scale(0.92);
 }
 
 .lyrics-scrape {
@@ -192,16 +232,19 @@ function seekTo(line: LrcLine) {
 }
 
 .stage {
+  position: relative;
+  z-index: 1;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 40px;
-  min-height: 0;
+  padding: 8px 0;
+  animation: fade-up 0.4s ease both;
 }
 
 .cover-wrap {
-  width: min(320px, 34vh);
-  height: min(320px, 34vh);
+  width: min(280px, 32vh);
+  height: min(280px, 32vh);
   border-radius: 16px;
   background: var(--bg-hover);
   display: flex;
@@ -210,6 +253,7 @@ function seekTo(line: LrcLine) {
   color: var(--text-dim);
   overflow: hidden;
   flex-shrink: 0;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.35);
 }
 
 .cover-wrap img {
@@ -217,6 +261,7 @@ function seekTo(line: LrcLine) {
   height: 100%;
   object-fit: cover;
   display: block;
+  animation: pop-in 0.45s cubic-bezier(0.2, 0.9, 0.3, 1.2) both;
 }
 
 .meta {
@@ -236,11 +281,21 @@ function seekTo(line: LrcLine) {
   font-size: 16px;
 }
 
+/* 歌词区：有界滚动 + 上下渐隐遮罩；横向永不滚动（active 行 scale 放大被裁剪） */
 .lyrics {
-  overflow: auto;
+  position: relative;
+  z-index: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
   text-align: center;
-  padding: 40px 0;
+  padding: 32px 0;
+  max-width: 760px;
+  width: 100%;
+  margin: 0 auto;
   scroll-behavior: smooth;
+  -webkit-mask-image: linear-gradient(transparent, #000 14%, #000 86%, transparent);
+  mask-image: linear-gradient(transparent, #000 14%, #000 86%, transparent);
 }
 
 .line {
@@ -274,6 +329,8 @@ function seekTo(line: LrcLine) {
 }
 
 .controls {
+  position: relative;
+  z-index: 1;
   display: flex;
   align-items: center;
   gap: 14px;
@@ -291,5 +348,27 @@ function seekTo(line: LrcLine) {
 .slider {
   flex: 1;
   accent-color: var(--accent);
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 </style>

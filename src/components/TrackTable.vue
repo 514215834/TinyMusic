@@ -221,10 +221,13 @@ function onTagSaved(updated: Track) {
 <style scoped>
 .track-table {
   flex: 1;
+  min-height: 0;
   overflow: auto;
   border: 1px solid var(--border);
   border-radius: 12px;
   position: relative;
+  /* 底部让位固定播放栏：最后几行可完整滚动到可见区 */
+  padding-bottom: 76px;
 }
 
 .body {
@@ -452,7 +455,8 @@ function onTagSaved(updated: Track) {
   cursor: pointer;
   transition:
     background-color 0.12s ease,
-    color 0.12s ease;
+    color 0.12s ease,
+    transform 0.12s ease;
 }
 
 .act svg {
@@ -462,6 +466,10 @@ function onTagSaved(updated: Track) {
 .act:hover {
   background: var(--border);
   color: var(--text);
+}
+
+.act:active {
+  transform: scale(0.88);
 }
 
 .act.on {

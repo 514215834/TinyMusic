@@ -20,6 +20,8 @@ export const libraryApi = {
   rescan: async () => unwrap(await commands.libraryRescan()),
   tracksQuery: async (page: number, pageSize: number) =>
     unwrap(await commands.tracksQuery(page, pageSize, null)),
+  /** 全量曲目（默认排序）：一键播放整库用 */
+  tracksAll: async () => unwrap(await commands.tracksAll()),
   trackGet: async (id: number) => unwrap(await commands.trackGet(id)),
   searchTracks: async (q: string, page = 1, pageSize = 200) =>
     unwrap(await commands.searchTracks(q, page, pageSize)),

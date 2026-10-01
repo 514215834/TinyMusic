@@ -4,6 +4,7 @@ import { useRoute } from "vue-router";
 import { Disc3, Globe } from "lucide-vue-next";
 import TrackTable from "../components/TrackTable.vue";
 import ScrapeModal from "../components/ScrapeModal.vue";
+import PlayAllButton from "../components/PlayAllButton.vue";
 import { coverUrl, libraryApi, type AlbumInfo, type Track } from "../services/library";
 import { t } from "../i18n";
 
@@ -45,10 +46,13 @@ watch(
           <template v-if="album?.year"> · {{ album.year }}</template>
           · {{ t("albums.trackCount", { n: tracks.length }) }}
         </div>
-        <button v-if="album" class="scrape-btn" @click="scraping = true">
-          <Globe :size="13" />
-          {{ t("scrape.albumAction") }}
-        </button>
+        <div class="actions">
+          <PlayAllButton :tracks="tracks" />
+          <button v-if="album" class="scrape-btn" @click="scraping = true">
+            <Globe :size="13" />
+            {{ t("scrape.albumAction") }}
+          </button>
+        </div>
       </div>
     </header>
     <TrackTable :tracks="tracks" :empty-text="t('table.empty')" />
@@ -98,6 +102,11 @@ watch(
   height: 100%;
   object-fit: cover;
   display: block;
+  transition: transform 0.3s ease;
+}
+
+.cover:hover img {
+  transform: scale(1.04);
 }
 
 .head h2 {
@@ -105,18 +114,24 @@ watch(
   font-size: 20px;
 }
 
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+}
+
 .scrape-btn {
-  margin-top: 10px;
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 5px 12px;
+  padding: 6px 14px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 999px;
   background: var(--bg-elev);
   color: var(--text);
   cursor: pointer;
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .scrape-btn svg {

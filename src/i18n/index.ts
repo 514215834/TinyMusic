@@ -147,6 +147,7 @@ const zh: Dict = {
   "player.nowPlaying": "正在播放",
   "player.nowPlayingEmpty": "当前没有播放中的曲目",
   "player.noLyrics": "暂无歌词",
+  "player.playAll": "播放全部",
 
   // 迷你悬浮窗
   "overlay.close": "关闭迷你播放器",
@@ -316,6 +317,7 @@ const en: Dict = {
   "player.nowPlaying": "Now Playing",
   "player.nowPlayingEmpty": "Nothing is playing right now",
   "player.noLyrics": "No lyrics available",
+  "player.playAll": "Play all",
 
   "overlay.close": "Close mini player",
 

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from "vue";
 import TrackTable from "../components/TrackTable.vue";
+import PlayAllButton from "../components/PlayAllButton.vue";
 import { useFavoritesStore } from "../stores/favorites";
 import { libraryApi, type Track } from "../services/library";
 import { t } from "../i18n";
@@ -19,6 +20,8 @@ onMounted(async () => {
     <header class="toolbar">
       <h2>{{ t("favorites.title") }}</h2>
       <span class="dim">{{ t("albums.trackCount", { n: tracks.length }) }}</span>
+      <div class="spacer"></div>
+      <PlayAllButton :tracks="tracks" />
     </header>
     <TrackTable :tracks="tracks" :empty-text="t('favorites.empty')" />
   </section>
@@ -36,6 +39,10 @@ onMounted(async () => {
   display: flex;
   align-items: center;
   gap: 10px;
+}
+
+.spacer {
+  flex: 1;
 }
 
 .toolbar h2 {

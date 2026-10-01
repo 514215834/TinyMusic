@@ -3,6 +3,7 @@ import { computed, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { Folder } from "lucide-vue-next";
 import TrackTable from "../components/TrackTable.vue";
+import PlayAllButton from "../components/PlayAllButton.vue";
 import { libraryApi, type Track } from "../services/library";
 import { t } from "../i18n";
 
@@ -60,6 +61,8 @@ watch(activeId, () => void loadTracks());
     <header class="toolbar">
       <h2>{{ t("folders.title") }}</h2>
       <span class="dim">{{ t("library.total", { n: tracks.length }) }}</span>
+      <div class="spacer"></div>
+      <PlayAllButton :tracks="tracks" />
     </header>
     <div class="panes">
       <nav class="folder-list">
@@ -102,6 +105,10 @@ watch(activeId, () => void loadTracks());
 .toolbar h2 {
   margin: 0;
   font-size: 18px;
+}
+
+.spacer {
+  flex: 1;
 }
 
 .panes {

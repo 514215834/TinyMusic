@@ -90,3 +90,18 @@ fn get_track(state: &AppState, id: i32) -> AppResult<Option<Track>> {
 pub async fn track_get(state: State<'_, AppState>, id: i32) -> Result<Option<Track>, AppErrorDto> {
     get_track(&state, id).map_err(AppErrorDto::from)
 }
+
+/// 全量曲目（默认排序）：列表「一键播放」用，一次取整库入播放队列
+fn all_tracks(state: &AppState) -> AppResult<Vec<Track>> {
+    let conn = state.conn.lock();
+    let sql = format!("{TRACK_SELECT} {}", order_clause(None));
+    let mut stmt = conn.prepare(&sql)?;
+    let items = stmt.query_map([], row_to_track)?.collect::<Result<Vec<_>, _>>()?;
+    Ok(items)
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn tracks_all(state: State<'_, AppState>) -> Result<Vec<Track>, AppErrorDto> {
+    all_tracks(&state).map_err(AppErrorDto::from)
+}

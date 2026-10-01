@@ -91,13 +91,17 @@ async function apply(candidate: LyricsCandidate) {
   position: fixed;
   inset: 0;
   background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 220;
+  animation: fade-in 0.15s ease both;
 }
 
 .modal {
+  animation: pop-in 0.2s cubic-bezier(0.2, 0.9, 0.3, 1.15) both;
   width: 520px;
   max-width: calc(100vw - 48px);
   height: 440px;

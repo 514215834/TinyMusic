@@ -3,6 +3,7 @@ import { computed, onMounted, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 import { Plus, Sparkles, Trash2 } from "lucide-vue-next";
 import TrackTable from "../components/TrackTable.vue";
+import PlayAllButton from "../components/PlayAllButton.vue";
 import { smartApi, type SmartRule, type Track } from "../services/smartPlaylists";
 import { t } from "../i18n";
 
@@ -123,6 +124,7 @@ onMounted(() => void load());
       <span v-if="saving" class="dim">{{ t("smart.saving") }}</span>
       <div class="spacer"></div>
       <span v-if="error" class="error">{{ error }}</span>
+      <PlayAllButton :tracks="tracks" />
     </header>
 
     <div class="editor">

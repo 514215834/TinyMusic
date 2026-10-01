@@ -80,6 +80,7 @@ export const commands = {
 	genre: string | null,
 	coverFile: string | null,
 } | null, AppErrorDto>(__TAURI_INVOKE("track_get", { id })),
+	tracksAll: () => typedError<Track[], AppErrorDto>(__TAURI_INVOKE("tracks_all")),
 	tracksQuery: (page: number | null, pageSize: number | null, sort: string | null) => typedError<TrackPage, AppErrorDto>(__TAURI_INVOKE("tracks_query", { page, pageSize, sort })),
 };
 

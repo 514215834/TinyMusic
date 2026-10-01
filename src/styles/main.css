@@ -43,6 +43,8 @@ body,
 #app {
   height: 100%;
   margin: 0;
+  /* 桌面应用：页面级不滚动，滚动全部发生在内部区域（防意外横向滚动条） */
+  overflow: hidden;
 }
 
 body {
@@ -51,6 +53,49 @@ body {
   color: var(--text);
   background: var(--bg);
   -webkit-font-smoothing: antialiased;
+}
+
+/* 复用动效关键帧（全局定义，scoped 样式直接引用） */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* 无障碍：系统开启"减弱动态效果"时所有动画/过渡即时完成 */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 .dim {

@@ -267,7 +267,11 @@ async function importPlaylist() {
     </aside>
 
     <main class="content">
-      <RouterView />
+      <RouterView v-slot="{ Component }">
+        <Transition name="view" mode="out-in">
+          <component :is="Component" />
+        </Transition>
+      </RouterView>
     </main>
 
     <footer class="player-bar">
@@ -279,20 +283,17 @@ async function importPlaylist() {
 </template>
 
 <style scoped>
+/* 播放栏为固定悬浮层：内容区在其下方滚动（毛玻璃透出列表），高度 100vh 单列网格 */
 .app-shell {
   display: grid;
   grid-template-columns: 220px 1fr;
-  grid-template-rows: 1fr 72px;
-  grid-template-areas:
-    "sidebar content"
-    "player player";
   height: 100vh;
+  overflow: hidden;
 }
 
 .sidebar {
-  grid-area: sidebar;
   border-right: 1px solid var(--border);
-  padding: 16px 12px;
+  padding: 16px 12px 96px;
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -318,11 +319,20 @@ async function importPlaylist() {
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  transition:
+    background-color 0.15s ease,
+    transform 0.15s ease;
 }
 
 .nav-item svg {
   display: block;
   color: var(--text-dim);
+  transition: color 0.15s ease;
+}
+
+.nav-item:hover {
+  background: var(--bg-hover);
+  transform: translateX(2px);
 }
 
 .nav-item.router-link-active {
@@ -474,17 +484,42 @@ async function importPlaylist() {
 }
 
 .content {
-  grid-area: content;
   overflow: auto;
-  padding: 20px 24px;
+  padding: 20px 24px 0;
+  min-width: 0;
 }
 
+/* 路由切换过渡（细腻淡入上移，不阻塞交互） */
+.view-enter-active,
+.view-leave-active {
+  transition:
+    opacity 0.16s ease,
+    transform 0.16s ease;
+}
+
+.view-enter-from {
+  opacity: 0;
+  transform: translateY(8px);
+}
+
+.view-leave-to {
+  opacity: 0;
+}
+
+/* 固定悬浮播放栏：内容从其下方滚过，毛玻璃透出列表 */
 .player-bar {
-  grid-area: player;
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 72px;
+  z-index: 90;
   border-top: 1px solid var(--border);
+  background: color-mix(in srgb, var(--bg-elev) 62%, transparent);
+  backdrop-filter: blur(28px) saturate(1.4);
+  -webkit-backdrop-filter: blur(28px) saturate(1.4);
   display: flex;
   align-items: center;
   padding: 0 16px;
-  position: relative;
 }
 </style>

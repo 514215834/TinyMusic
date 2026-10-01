@@ -5,6 +5,7 @@ import { save } from "@tauri-apps/plugin-dialog";
 import { Download, ListMusic, Plus } from "lucide-vue-next";
 import AddTracksModal from "../components/AddTracksModal.vue";
 import TrackTable from "../components/TrackTable.vue";
+import PlayAllButton from "../components/PlayAllButton.vue";
 import { playlistsApi, type Playlist, type Track } from "../services/playlists";
 import { t } from "../i18n";
 
@@ -81,6 +82,7 @@ async function exportPlaylist() {
       <span class="dim">{{ t("albums.trackCount", { n: tracks.length }) }}</span>
       <div class="spacer"></div>
       <span v-if="exportError" class="error">{{ exportError }}</span>
+      <PlayAllButton :tracks="tracks" />
       <button class="ghost" @click="exportPlaylist">
         <Download :size="14" />
         {{ t("playlist.export") }}

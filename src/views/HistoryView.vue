@@ -2,6 +2,7 @@
 import { onMounted, ref } from "vue";
 import { History } from "lucide-vue-next";
 import TrackTable from "../components/TrackTable.vue";
+import PlayAllButton from "../components/PlayAllButton.vue";
 import { statsApi, type Track } from "../services/library";
 import { t } from "../i18n";
 
@@ -42,6 +43,8 @@ onMounted(load);
         </button>
       </div>
       <span class="dim">{{ t("albums.trackCount", { n: tracks.length }) }}</span>
+      <div class="spacer"></div>
+      <PlayAllButton :tracks="tracks" />
     </header>
     <TrackTable :tracks="tracks" :empty-text="t('history.empty')" />
     <div v-if="loading" class="dim loading">{{ t("library.loading") }}</div>
@@ -60,6 +63,10 @@ onMounted(load);
   display: flex;
   align-items: center;
   gap: 10px;
+}
+
+.spacer {
+  flex: 1;
 }
 
 .toolbar h2 {

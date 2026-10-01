@@ -79,14 +79,18 @@ function onDrop() {
   right: 12px;
   bottom: 76px;
   width: 340px;
+  max-width: calc(100vw - 24px);
   max-height: 420px;
   display: flex;
   flex-direction: column;
-  background: var(--bg-elev);
+  background: color-mix(in srgb, var(--bg-elev) 72%, transparent);
+  backdrop-filter: blur(24px) saturate(1.4);
+  -webkit-backdrop-filter: blur(24px) saturate(1.4);
   border: 1px solid var(--border);
   border-radius: 12px;
   box-shadow: 0 8px 28px rgba(0, 0, 0, 0.18);
   z-index: 50;
+  animation: fade-up 0.18s ease both;
 }
 
 .q-head {

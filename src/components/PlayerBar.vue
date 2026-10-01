@@ -72,7 +72,13 @@ function toggleOverlay() {
 <template>
   <div class="player-bar">
     <div class="now">
-      <img v-if="coverUrl" :src="coverUrl" class="cover" alt="封面" />
+      <img
+        v-if="coverUrl"
+        :key="player.currentTrack?.id ?? 'none'"
+        :src="coverUrl"
+        class="cover pop"
+        alt="封面"
+      />
       <div v-else class="cover cover-empty"></div>
       <div class="meta">
         <div class="title" :title="player.currentTrack?.title">
@@ -166,11 +172,14 @@ function toggleOverlay() {
 <style scoped>
 .player-bar {
   height: 100%;
+  width: 100%;
   display: grid;
-  grid-template-columns: minmax(180px, 1fr) auto minmax(220px, 2fr) minmax(200px, 1fr);
+  grid-template-columns: minmax(140px, 1fr) auto minmax(160px, 2fr) minmax(0, 1.1fr);
   gap: 16px;
   align-items: center;
   padding: 0 16px;
+  /* 窄窗口下整体可收缩，标题省略号兜底，杜绝横向滚动条 */
+  min-width: 0;
 }
 
 .now {
@@ -186,6 +195,10 @@ function toggleOverlay() {
   border-radius: 8px;
   object-fit: cover;
   flex-shrink: 0;
+}
+
+.cover.pop {
+  animation: pop-in 0.35s cubic-bezier(0.2, 0.9, 0.3, 1.25) both;
 }
 
 .cover-empty {
@@ -228,15 +241,22 @@ function toggleOverlay() {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease,
+    transform 0.12s ease;
 }
 
-/* SVG 按 block 渲染，消除内联基线偏移导致的视觉不居中 */
 .icon svg {
   display: block;
 }
 
 .icon:hover:not(:disabled) {
   background: var(--bg-hover);
+}
+
+.icon:active:not(:disabled) {
+  transform: scale(0.88);
 }
 
 .icon.on {
@@ -248,6 +268,7 @@ function toggleOverlay() {
   height: 42px;
   background: var(--accent);
   color: #fff;
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--accent) 45%, transparent);
 }
 
 .icon.play:hover:not(:disabled) {
@@ -278,6 +299,7 @@ function toggleOverlay() {
   align-items: center;
   gap: 4px;
   justify-content: flex-end;
+  min-width: 0;
 }
 
 .slider {
@@ -288,6 +310,7 @@ function toggleOverlay() {
 
 .slider.volume {
   flex: 0 1 100px;
+  min-width: 0;
 }
 
 .speed {

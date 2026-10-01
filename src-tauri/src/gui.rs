@@ -58,6 +58,7 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
         crate::commands::stats::history_top,
         crate::commands::tags::tag_update,
         crate::commands::tracks::track_get,
+        crate::commands::tracks::tracks_all,
         crate::commands::tracks::tracks_query,
     ])
 }
