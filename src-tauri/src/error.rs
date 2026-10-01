@@ -13,6 +13,8 @@ pub enum AppError {
     Encoding(#[from] lofty::error::FileEncodingError),
     #[error("网络错误: {0}")]
     Network(#[from] reqwest::Error),
+    #[error("移入回收站失败: {0}")]
+    Trash(#[from] trash::Error),
     #[error("Tauri 错误: {0}")]
     Tauri(#[from] tauri::Error),
     #[error("JSON 错误: {0}")]

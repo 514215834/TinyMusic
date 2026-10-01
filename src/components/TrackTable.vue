@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
-import { Heart, ListPlus, ListStart, Music, Pencil, Play, X } from "lucide-vue-next";
+import { CheckCheck, Heart, ListPlus, ListStart, Music, Pencil, Play, X } from "lucide-vue-next";
 import { libraryApi, type Track } from "../services/library";
 import { useFavoritesStore } from "../stores/favorites";
 import { usePlayerStore } from "../stores/player";
@@ -9,6 +9,7 @@ import { formatTime } from "../utils";
 import { t } from "../i18n";
 import TagEditorModal from "./TagEditorModal.vue";
 import ScrapeModal from "./ScrapeModal.vue";
+import BatchTagModal from "./BatchTagModal.vue";
 
 const props = withDefaults(
   defineProps<{
@@ -100,6 +101,43 @@ function isCurrent(track: Track) {
   return player.currentTrack?.id === track.id;
 }
 
+/* ---- 多选（M6）：单击选中，Ctrl+单击切换，Shift+单击范围选择；双击仍播放 ---- */
+const selected = ref<Set<number>>(new Set());
+const anchorIndex = ref<number | null>(null);
+const batchModal = ref(false);
+
+function onRowClick(index: number, track: Track, e: MouseEvent) {
+  if (e.ctrlKey || e.metaKey) {
+    const next = new Set(selected.value);
+    if (next.has(track.id)) next.delete(track.id);
+    else next.add(track.id);
+    selected.value = next;
+    anchorIndex.value = index;
+  } else if (e.shiftKey && anchorIndex.value != null) {
+    const [a, b] = [anchorIndex.value, index].sort((x, y) => x - y);
+    const next = new Set(selected.value);
+    for (let i = a; i <= b; i++) {
+      const tr = props.tracks[i];
+      if (tr) next.add(tr.id);
+    }
+    selected.value = next;
+  } else {
+    selected.value = new Set([track.id]);
+    anchorIndex.value = index;
+  }
+}
+
+const selectedTracks = computed(() => props.tracks.filter((tr) => selected.value.has(tr.id)));
+
+function clearSelection() {
+  selected.value = new Set();
+  anchorIndex.value = null;
+}
+
+function onBatchSaved() {
+  clearSelection();
+}
+
 /* ---- 标签编辑与单曲刮削（M4）：就地更新行对象，所有视图同步刷新 ---- */
 const editingTrack = ref<Track | null>(null);
 const scrapingTrack = ref<Track | null>(null);
@@ -119,7 +157,8 @@ function onTagSaved(updated: Track) {
 </script>
 
 <template>
-  <div ref="scroller" class="track-table" @scroll="onScroll">
+  <div class="track-wrap">
+    <div ref="scroller" class="track-table" @scroll="onScroll">
     <div class="row head">
       <span class="col idx">#</span>
       <span class="col title">{{ t("table.title") }}</span>
@@ -134,11 +173,13 @@ function onTagSaved(updated: Track) {
         class="row"
         :class="{
           playing: isCurrent(track),
+          selected: selected.has(track.id),
           dragging: dragIndex === index,
           over: overIndex === index && dragIndex !== index,
         }"
         :style="{ top: `${index * ROW_H}px`, height: `${ROW_H}px` }"
         :draggable="draggable || undefined"
+        @click="onRowClick(index, track, $event)"
         @dblclick="playRow(index)"
         @dragstart="onDragStart(index)"
         @dragover.prevent="onDragOver(index)"
@@ -151,7 +192,7 @@ function onTagSaved(updated: Track) {
             <i></i><i></i><i></i>
           </span>
           <span v-else class="idx-num">{{ index + 1 }}</span>
-          <button class="idx-play" :title="t('player.play')" @click="playRow(index)">
+          <button class="idx-play" :title="t('player.play')" @click.stop="playRow(index)">
             <Play :size="12" />
           </button>
         </span>
@@ -167,7 +208,7 @@ function onTagSaved(updated: Track) {
         <span class="col dur dim">{{
           track.durationSec ? formatTime(track.durationSec) : "—"
         }}</span>
-        <span class="row-actions">
+        <span class="row-actions" @click.stop>
           <template v-if="!playlistMode">
             <button
               class="act"
@@ -198,7 +239,24 @@ function onTagSaved(updated: Track) {
       <span class="dim">{{ emptyText }}</span>
     </div>
 
+    </div>
+
+    <!-- 选中操作条：悬浮于表格右下，不挤压布局 -->
+    <div v-if="selected.size > 0" class="sel-pill">
+      <CheckCheck :size="14" />
+      <span class="sel-count">{{ t("batch.selected", { n: selected.size }) }}</span>
+      <span class="dim sel-hint">{{ t("batch.selectHint") }}</span>
+      <button class="sel-edit" @click="batchModal = true">
+        <Pencil :size="12" />
+        {{ t("batch.edit") }}
+      </button>
+      <button class="sel-x" :title="t('batch.clearSelection')" @click="clearSelection">
+        <X :size="12" />
+      </button>
+    </div>
+
     <Teleport to="body">
+      <BatchTagModal v-if="batchModal" :tracks="selectedTracks" @close="batchModal = false" @saved="onBatchSaved" />
       <TagEditorModal
         v-if="editingTrack"
         :track="editingTrack"
@@ -220,6 +278,14 @@ function onTagSaved(updated: Track) {
 </template>
 
 <style scoped>
+.track-wrap {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
 .track-table {
   flex: 1;
   min-height: 0;
@@ -231,6 +297,91 @@ function onTagSaved(updated: Track) {
   position: relative;
   /* 底部让位固定播放栏：最后几行可完整滚动到可见区 */
   padding-bottom: 76px;
+}
+
+/* 多选选中行 */
+.row.selected,
+.row.selected:hover {
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+}
+
+.row.playing.selected {
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+/* 选中操作条：悬浮于表格右下 */
+.sel-pill {
+  position: absolute;
+  right: 16px;
+  bottom: 88px;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--bg-elev) 82%, transparent);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+  animation: pop-in 0.18s ease both;
+}
+
+.sel-pill svg {
+  display: block;
+  color: var(--accent);
+}
+
+.sel-count {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.sel-hint {
+  font-size: 11px;
+}
+
+.sel-edit {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 12px;
+  border: none;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--on-accent);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.sel-edit svg {
+  display: block;
+  color: inherit;
+}
+
+.sel-edit:hover {
+  filter: brightness(1.08);
+}
+
+.sel-x {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+
+.sel-x:hover {
+  background: var(--bg-hover);
+  color: var(--text);
 }
 
 .body {

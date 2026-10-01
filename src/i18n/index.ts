@@ -13,6 +13,7 @@ const zh: Dict = {
   "nav.albums": "专辑",
   "nav.artists": "艺人",
   "nav.folders": "文件夹",
+  "nav.duplicates": "重复曲目",
   "nav.favorites": "收藏",
   "nav.history": "最近播放",
   "nav.settings": "设置",
@@ -196,6 +197,47 @@ const zh: Dict = {
   "common.on": "开",
   "common.off": "关",
   "common.none": "—",
+
+
+  // M6 批量标签
+  "batch.title": "批量编辑标签（{n} 首）",
+  "batch.hint": "留空的字段不修改；修改直接写回各源文件，个别失败不影响其余",
+  "batch.unchanged": "不修改",
+  "batch.renumber": "曲号按列表顺序重编",
+  "batch.startFrom": "起始曲号",
+  "batch.apply": "应用到 {n} 首",
+  "batch.failed": "{n} 首写入失败",
+  "batch.selected": "已选 {n} 首",
+  "batch.selectHint": "Ctrl/Shift+点击 可多选",
+  "batch.edit": "批量编辑",
+  "batch.clearSelection": "取消选择",
+
+  // M6 重复曲目
+  "dup.title": "重复曲目",
+  "dup.groupCount": "{g} 组重复，可清理 {n} 首",
+  "dup.empty": "没有检测到重复曲目",
+  "dup.emptyHint": "按归一化标题+艺人+时长±2s 分组；同一首歌在多个目录都会出现在这里",
+  "dup.rescan": "重新检测",
+  "dup.keep": "保留",
+  "dup.duplicate": "重复",
+  "dup.keepFirst": "保留最早，清理其余",
+  "dup.trash": "移入回收站",
+  "dup.groupResolved": "已清理 {n} 首" + "（失败 {f}）",
+  "dup.oneResolved": "已移入回收站 {n} 首",
+
+  // M6 封面向导
+  "coverWiz.open": "批量刮削封面",
+  "coverWiz.missing": "{n} 张专辑缺封面，点击批量刮削",
+  "coverWiz.title": "批量刮削缺失封面",
+  "coverWiz.none": "所有专辑都有封面",
+  "coverWiz.done": "向导完成",
+  "coverWiz.applied": "成功 {n}",
+  "coverWiz.skipped": "跳过 {n}",
+  "coverWiz.missed": "未命中 {n}",
+  "coverWiz.failed": "失败 {n}",
+  "coverWiz.autoSkip": "无候选自动跳过",
+  "coverWiz.skip": "跳过",
+  "coverWiz.keyHint": "Enter 应用首个候选 · Esc 跳过",
 };
 
 const en: Dict = {
@@ -203,6 +245,7 @@ const en: Dict = {
   "nav.albums": "Albums",
   "nav.artists": "Artists",
   "nav.folders": "Folders",
+  "nav.duplicates": "Duplicates",
   "nav.favorites": "Favorites",
   "nav.history": "History",
   "nav.settings": "Settings",

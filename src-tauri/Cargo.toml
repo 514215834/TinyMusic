@@ -1,6 +1,6 @@
 [package]
 name = "tinymusic"
-version = "0.6.1"
+version = "0.7.0"
 description = "TinyMusic - 极简本地桌面音乐播放器"
 authors = ["jinfenglong"]
 edition = "2021"
@@ -36,6 +36,7 @@ specta-typescript = "0.0.12"
 notify = "8"
 reqwest = { version = "0.12", features = ["json"] }
 tokio = { version = "1", default-features = false, features = ["macros", "time", "sync"] }
+trash = "5"
 tauri-plugin-global-shortcut = "2"
 windows = { version = "0.62.2", features = ["Foundation", "Media", "Media_Playback", "Storage_Streams", "Win32_Foundation", "Win32_Graphics_Dwm", "Win32_System_WinRT"] }
 

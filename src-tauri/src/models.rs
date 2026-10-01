@@ -209,3 +209,49 @@ pub struct LyricsCandidate {
     pub synced_lyrics: Option<String>,
     pub plain_lyrics: Option<String>,
 }
+
+/// 批量标签编辑（M6）：None = 不修改该字段（区别于单曲编辑的 null=清除）；
+/// 曲号重编 = track_no_start 起按传入顺序重编
+#[derive(Debug, Clone, Deserialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub struct BatchTagPatch {
+    pub artist: Option<String>,
+    pub album: Option<String>,
+    pub genre: Option<String>,
+    pub year: Option<i32>,
+    pub track_no_start: Option<i32>,
+}
+
+#[derive(Debug, Clone, Serialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub struct BatchTagResult {
+    pub updated: Vec<Track>,
+    pub failed: u32,
+    pub first_error: Option<String>,
+}
+
+/// 重复曲目组（M6）：items 按添加时间升序，items[0] 为保留候选
+#[derive(Debug, Clone, Serialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub struct DuplicateGroup {
+    pub title: String,
+    pub artist: String,
+    pub items: Vec<DuplicateItem>,
+}
+
+#[derive(Debug, Clone, Serialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub struct DuplicateItem {
+    pub track: Track,
+    /// 字节数（f64 承载，specta 禁 i64）
+    pub size: f64,
+    pub created_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub struct DuplicateResolve {
+    pub removed: u32,
+    pub failed: u32,
+    pub first_error: Option<String>,
+}

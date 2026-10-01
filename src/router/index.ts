@@ -54,6 +54,11 @@ const router = createRouter({
           component: () => import("../views/SmartPlaylistView.vue"),
         },
         {
+          path: "duplicates",
+          name: "duplicates",
+          component: () => import("../views/DuplicatesView.vue"),
+        },
+        {
           path: "settings",
           name: "settings",
           component: () => import("../views/SettingsView.vue"),

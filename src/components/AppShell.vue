@@ -3,6 +3,7 @@ import { onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import { open } from "@tauri-apps/plugin-dialog";
 import {
+  CopyX,
   Disc3,
   Folder,
   Heart,
@@ -154,6 +155,10 @@ async function importPlaylist() {
         <RouterLink class="nav-item" :to="{ name: 'favorites' }">
           <Heart :size="16" />
           {{ t("nav.favorites") }}
+        </RouterLink>
+        <RouterLink class="nav-item" :to="{ name: 'duplicates' }">
+          <CopyX :size="16" />
+          {{ t("nav.duplicates") }}
         </RouterLink>
         <RouterLink class="nav-item" :to="{ name: 'history' }">
           <History :size="16" />

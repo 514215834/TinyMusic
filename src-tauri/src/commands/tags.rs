@@ -12,7 +12,7 @@ use rusqlite::params;
 use tauri::State;
 
 use crate::error::{AppError, AppErrorDto, AppResult};
-use crate::models::{TagPatch, Track};
+use crate::models::{BatchTagPatch, BatchTagResult, TagPatch, Track};
 use crate::AppState;
 
 use super::tracks::{row_to_track, TRACK_SELECT};
@@ -158,6 +158,78 @@ fn get_or_create_album(conn: &rusqlite::Connection, name: &str, artist_id: Optio
         params![name, artist_name],
         |r| r.get(0),
     )?)
+}
+
+/// 批量标签编辑（M6）：留空字段=不修改（沿用现值），曲号重编按传入顺序起始号递增。
+/// 逐首 写回文件 → 曲库同步（各自事务）；单首失败不中断，返回 成功列表/失败数/首个错误。
+#[tauri::command]
+#[specta::specta]
+pub async fn tag_update_batch(
+    state: State<'_, AppState>,
+    track_ids: Vec<i32>,
+    patch: BatchTagPatch,
+) -> Result<BatchTagResult, AppErrorDto> {
+    let mut updated: Vec<Track> = Vec::new();
+    let mut failed = 0u32;
+    let mut first_error: Option<String> = None;
+
+    for (i, track_id) in track_ids.iter().enumerate() {
+        let current: Option<Track> = {
+            let conn = state.conn.lock();
+            let sql = format!("{TRACK_SELECT} WHERE t.id = ?1");
+            match conn.prepare(&sql).and_then(|mut stmt| {
+                stmt.query_row(params![i64::from(*track_id)], row_to_track)
+            }) {
+                Ok(t) => Some(t),
+                Err(rusqlite::Error::QueryReturnedNoRows) => None,
+                Err(e) => {
+                    failed += 1;
+                    first_error.get_or_insert_with(|| e.to_string());
+                    continue;
+                }
+            }
+        };
+        let Some(current) = current else {
+            failed += 1;
+            first_error.get_or_insert_with(|| format!("曲目 {track_id} 不存在"));
+            continue;
+        };
+
+        // 合并：批量字段 None = 沿用现值；曲号 = 起始号 + 列表位次
+        let effective = TagPatch {
+            title: current.title.clone(),
+            artist: patch.artist.clone().or(current.artist.clone()),
+            album: patch.album.clone().or(current.album.clone()),
+            genre: patch.genre.clone().or(current.genre.clone()),
+            year: patch.year.or(current.year),
+            track_no: patch.track_no_start.map(|s| s + i as i32).or(current.track_no),
+        };
+
+        let result = write_tags(Path::new(&current.path), &effective).and_then(|_| {
+            let mut conn = state.conn.lock();
+            apply_tag_to_db(&mut conn, i64::from(*track_id), &effective)
+        });
+        match result {
+            Ok(()) => {
+                let conn = state.conn.lock();
+                let sql = format!("{TRACK_SELECT} WHERE t.id = ?1");
+                match conn.prepare(&sql).and_then(|mut stmt| {
+                    stmt.query_row(params![i64::from(*track_id)], row_to_track)
+                }) {
+                    Ok(t) => updated.push(t),
+                    Err(e) => {
+                        failed += 1;
+                        first_error.get_or_insert_with(|| e.to_string());
+                    }
+                }
+            }
+            Err(e) => {
+                failed += 1;
+                first_error.get_or_insert_with(|| e.to_string());
+            }
+        }
+    }
+    Ok(BatchTagResult { updated, failed, first_error })
 }
 
 #[tauri::command]

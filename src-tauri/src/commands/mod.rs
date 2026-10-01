@@ -1,5 +1,6 @@
 pub mod albums;
 pub mod covers;
+pub mod duplicates;
 pub mod favorites;
 pub mod folders;
 pub mod history;

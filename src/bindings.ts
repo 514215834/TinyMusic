@@ -9,6 +9,9 @@ export const commands = {
 	artistTracks: (artistId: number) => typedError<Track[], AppErrorDto>(__TAURI_INVOKE("artist_tracks", { artistId })),
 	artistsQuery: () => typedError<ArtistInfo[], AppErrorDto>(__TAURI_INVOKE("artists_query")),
 	coverPath: (file: string) => typedError<string | null, AppErrorDto>(__TAURI_INVOKE("cover_path", { file })),
+	/**  清理重复项：源文件移入回收站成功后删除曲库记录（级联清 歌单曲目/收藏/播放历史） */
+	duplicateResolve: (keepId: number, removeIds: number[]) => typedError<DuplicateResolve, AppErrorDto>(__TAURI_INVOKE("duplicate_resolve", { keepId, removeIds })),
+	duplicatesScan: () => typedError<DuplicateGroup[], AppErrorDto>(__TAURI_INVOKE("duplicates_scan")),
 	favoriteToggle: (trackId: number) => typedError<boolean, AppErrorDto>(__TAURI_INVOKE("favorite_toggle", { trackId })),
 	/**  收藏 id 集合（前端行内红心状态用，避免逐行查询） */
 	favoritesIds: () => typedError<number[], AppErrorDto>(__TAURI_INVOKE("favorites_ids")),
@@ -78,6 +81,11 @@ export const commands = {
 	historyRecent: (limit: number | null) => typedError<Track[], AppErrorDto>(__TAURI_INVOKE("history_recent", { limit })),
 	historyTop: (limit: number | null) => typedError<Track[], AppErrorDto>(__TAURI_INVOKE("history_top", { limit })),
 	tagUpdate: (trackId: number, patch: TagPatch) => typedError<Track, AppErrorDto>(__TAURI_INVOKE("tag_update", { trackId, patch })),
+	/**
+	 *  批量标签编辑（M6）：留空字段=不修改（沿用现值），曲号重编按传入顺序起始号递增。
+	 *  逐首 写回文件 → 曲库同步（各自事务）；单首失败不中断，返回 成功列表/失败数/首个错误。
+	 */
+	tagUpdateBatch: (trackIds: number[], patch: BatchTagPatch) => typedError<BatchTagResult, AppErrorDto>(__TAURI_INVOKE("tag_update_batch", { trackIds, patch })),
 	trackGet: (id: number) => typedError<{
 	id: number,
 	path: string,
@@ -131,6 +139,44 @@ export type ArtistInfo = {
 	name: string,
 	trackCount: number,
 	albumCount: number,
+};
+
+/**
+ *  批量标签编辑（M6）：None = 不修改该字段（区别于单曲编辑的 null=清除）；
+ *  曲号重编 = track_no_start 起按传入顺序重编
+ */
+export type BatchTagPatch = {
+	artist: string | null,
+	album: string | null,
+	genre: string | null,
+	year: number | null,
+	trackNoStart: number | null,
+};
+
+export type BatchTagResult = {
+	updated: Track[],
+	failed: number,
+	firstError: string | null,
+};
+
+/**  重复曲目组（M6）：items 按添加时间升序，items[0] 为保留候选 */
+export type DuplicateGroup = {
+	title: string,
+	artist: string,
+	items: DuplicateItem[],
+};
+
+export type DuplicateItem = {
+	track: Track,
+	/**  字节数（f64 承载，specta 禁 i64） */
+	size: number | null,
+	createdAt: string,
+};
+
+export type DuplicateResolve = {
+	removed: number,
+	failed: number,
+	firstError: string | null,
 };
 
 /**  对外 DTO 统一用 i32/u32（specta-typescript 禁止 i64/u64 导出），DB 层内部仍用 i64 */

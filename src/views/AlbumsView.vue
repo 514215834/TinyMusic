@@ -1,21 +1,26 @@
 <script setup lang="ts">
-import { onMounted, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
-import { Disc3 } from "lucide-vue-next";
+import { Disc3, ImageDown } from "lucide-vue-next";
+import CoverBatchWizard from "../components/CoverBatchWizard.vue";
 import { coverUrl, libraryApi, type AlbumInfo } from "../services/library";
 import { t } from "../i18n";
 
 const router = useRouter();
 const albums = ref<AlbumInfo[]>([]);
 const covers = ref<Record<number, string | null>>({});
+const wizardOpen = ref(false);
+const missingCount = computed(() => albums.value.filter((a) => !a.coverFile).length);
 
-onMounted(async () => {
+async function reload() {
   albums.value = await libraryApi.albumsQuery();
   // 封面就绪后逐张替换占位（列表渲染不阻塞在封面 IO 上）
   for (const a of albums.value) {
     covers.value[a.id] = await coverUrl(a.coverFile);
   }
-});
+}
+
+onMounted(reload);
 
 function open(album: AlbumInfo) {
   void router.push({ name: "album-detail", params: { id: album.id } });
@@ -27,6 +32,12 @@ function open(album: AlbumInfo) {
     <header class="toolbar">
       <h2>{{ t("albums.title") }}</h2>
       <span class="dim">{{ albums.length }}</span>
+      <div class="spacer"></div>
+      <button class="wizard-btn" :disabled="!missingCount" :title="t('coverWiz.missing', { n: missingCount })" @click="wizardOpen = true">
+        <ImageDown :size="13" />
+        {{ t("coverWiz.open") }}
+        <span v-if="missingCount" class="badge">{{ missingCount }}</span>
+      </button>
     </header>
     <div v-if="albums.length" class="wall">
       <button v-for="a in albums" :key="a.id" class="card" @click="open(a)">
@@ -42,6 +53,8 @@ function open(album: AlbumInfo) {
       </button>
     </div>
     <div v-else class="empty dim">{{ t("albums.empty") }}</div>
+
+    <CoverBatchWizard v-if="wizardOpen" @close="wizardOpen = false" @done="reload" />
   </section>
 </template>
 
@@ -62,6 +75,45 @@ function open(album: AlbumInfo) {
 .toolbar h2 {
   margin: 0;
   font-size: 18px;
+}
+
+.spacer {
+  flex: 1;
+}
+
+.wizard-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg-elev);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.wizard-btn svg {
+  display: block;
+}
+
+.wizard-btn:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.wizard-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.wizard-btn .badge {
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  color: var(--accent);
+  font-weight: 600;
 }
 
 .wall {
