@@ -36,7 +36,6 @@ export function usePointerReorder(options: {
   let lastY = 0;
   let scrollRaf = 0;
   let escHandler: ((e: KeyboardEvent) => void) | null = null;
-  let clickCapture: ((e: MouseEvent) => void) | null = null;
 
   function isInteractive(e: PointerEvent): boolean {
     const el = e.target as HTMLElement | null;
@@ -113,21 +112,31 @@ export function usePointerReorder(options: {
     e.preventDefault();
   }
 
-  /** 拖拽结束后吞掉紧接着的合成 click（避免误触发行导航/选中） */
-  function suppressNextClick() {
-    clickCapture = (e: MouseEvent) => {
-      e.stopPropagation();
-      e.preventDefault();
-      releaseClickCapture();
-    };
-    document.addEventListener("click", clickCapture, true);
-  }
+  /* 拖拽提交后吞掉本次手势的合成 click（防误导航/误选中）。
+     必须是单一常驻监听 + 标志位：若每次拖拽注册一次性监听，两次拖拽之间没有点击时
+     闭包变量被覆盖、前一个监听泄漏在 document 上，会永久吞掉后续所有点击
+     （表现为拖几次后整个应用点击无响应）。 */
+  let swallowNextClick = false;
+  let swallowInstalled = false;
+  const swallowClick = (e: MouseEvent) => {
+    if (!swallowNextClick) return;
+    swallowNextClick = false;
+    e.stopPropagation();
+    e.preventDefault();
+  };
+  const clearSwallow = () => {
+    swallowNextClick = false;
+  };
 
-  function releaseClickCapture() {
-    if (clickCapture) {
-      document.removeEventListener("click", clickCapture, true);
-      clickCapture = null;
+  function armClickSwallow() {
+    swallowNextClick = true;
+    if (!swallowInstalled) {
+      document.addEventListener("click", swallowClick, true);
+      swallowInstalled = true;
     }
+    // 任何后续手势的 pointerdown 都先于其 click 派发：到这里说明拖拽的
+    // 合成 click 已经结束（或根本没产生），立刻解除吞掉，不影响正常点击
+    document.addEventListener("pointerdown", clearSwallow, { capture: true, once: true });
   }
 
   function removeDocumentListeners() {
@@ -148,6 +157,7 @@ export function usePointerReorder(options: {
       escHandler = null;
     }
     removeDocumentListeners();
+    document.removeEventListener("pointerdown", clearSwallow, { capture: true });
   }
 
   function onDocumentPointerUp(e: PointerEvent) {
@@ -165,7 +175,7 @@ export function usePointerReorder(options: {
     }
     cleanup();
     if (from != null && to != null && from !== to) {
-      suppressNextClick();
+      armClickSwallow();
       onReorder(from, to);
     }
   }
@@ -189,7 +199,13 @@ export function usePointerReorder(options: {
     document.addEventListener("pointercancel", onDocumentCancel);
   }
 
-  onBeforeUnmount(cleanup);
+  onBeforeUnmount(() => {
+    cleanup();
+    if (swallowInstalled) {
+      document.removeEventListener("click", swallowClick, true);
+      swallowInstalled = false;
+    }
+  });
 
   return { dragIndex, overIndex, dragging, onPointerDown };
 }
