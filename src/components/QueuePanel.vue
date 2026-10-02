@@ -3,28 +3,11 @@ import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import { ListMusic, X } from "lucide-vue-next";
 import { usePlayerStore } from "../stores/player";
 import { useCovers } from "../composables/useCovers";
+import { usePointerReorder } from "../composables/usePointerReorder";
 import { formatTime } from "../utils";
 import { t } from "../i18n";
 
 const player = usePlayerStore();
-
-/* HTML5 拖拽重排：记录拖起点，落到目标行完成移位（索引为 userQueue 绝对下标） */
-const dragIndex = ref<number | null>(null);
-const overIndex = ref<number | null>(null);
-
-function onDragStart(index: number) {
-  dragIndex.value = index;
-}
-function onDragOver(index: number) {
-  overIndex.value = index;
-}
-function onDrop() {
-  if (dragIndex.value != null && overIndex.value != null) {
-    player.reorderUserQueue(dragIndex.value, overIndex.value);
-  }
-  dragIndex.value = null;
-  overIndex.value = null;
-}
 
 /* ---- 虚拟列表（固定行高）：播放全部可入队上万首，只渲染可视窗口 ± overscan ---- */
 const ROW_H = 42;
@@ -64,6 +47,15 @@ function onScroll(e: Event) {
 
 /* 封面只解析可视窗口内的行 */
 const covers = useCovers(() => rows.value.map((r) => r.track));
+
+/* 拖拽重排（指针实现，Windows 下 HTML5 DnD 被 Tauri dragDropTarget 吞掉）：
+   索引为 userQueue 绝对下标，虚拟行元素携带 data-index */
+const { dragIndex, overIndex, onPointerDown } = usePointerReorder({
+  scroller,
+  container: scroller,
+  itemSelector: ".q-item",
+  onReorder: (from, to) => player.reorderUserQueue(from, to),
+});
 </script>
 
 <template>
@@ -110,12 +102,8 @@ const covers = useCovers(() => rows.value.map((r) => r.track));
           class="q-item"
           :class="{ dragging: dragIndex === index, over: overIndex === index && dragIndex !== index }"
           :style="{ top: `${index * ROW_H}px`, height: `${ROW_H}px` }"
-          draggable="true"
-          @dragstart="onDragStart(index)"
-          @dragover.prevent="onDragOver(index)"
-          @dragleave="overIndex = null"
-          @dragend="onDrop"
-          @drop.prevent="onDrop"
+          :data-index="index"
+          @pointerdown="onPointerDown(index, $event)"
           @dblclick="player.removeFromQueue(index)"
         >
           <span class="q-cover">

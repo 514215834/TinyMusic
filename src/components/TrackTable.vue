@@ -5,6 +5,7 @@ import { libraryApi, type Track } from "../services/library";
 import { useFavoritesStore } from "../stores/favorites";
 import { usePlayerStore } from "../stores/player";
 import { useCovers } from "../composables/useCovers";
+import { usePointerReorder } from "../composables/usePointerReorder";
 import { formatTime } from "../utils";
 import { t } from "../i18n";
 import TagEditorModal from "./TagEditorModal.vue";
@@ -29,23 +30,6 @@ const emit = defineEmits<{ remove: [track: Track]; reorder: [from: number, to: n
 const player = usePlayerStore();
 const favorites = useFavoritesStore();
 void favorites.load();
-
-/* ---- 行拖拽重排（歌单排序）---- */
-const dragIndex = ref<number | null>(null);
-const overIndex = ref<number | null>(null);
-function onDragStart(index: number) {
-  dragIndex.value = index;
-}
-function onDragOver(index: number) {
-  overIndex.value = index;
-}
-function onDrop() {
-  if (dragIndex.value != null && overIndex.value != null && dragIndex.value !== overIndex.value) {
-    emit("reorder", dragIndex.value, overIndex.value);
-  }
-  dragIndex.value = null;
-  overIndex.value = null;
-}
 
 /* ---- 虚拟列表（固定行高）：只渲染可视窗口 ± overscan 的行 ---- */
 const ROW_H = 44;
@@ -99,6 +83,18 @@ async function toggleFav(track: Track) {
 
 function isCurrent(track: Track) {
   return player.currentTrack?.id === track.id;
+}
+
+/* ---- 行拖拽重排（歌单排序，指针实现——Windows 下 HTML5 DnD 被 Tauri dragDropTarget 吞掉）---- */
+const { dragIndex, overIndex, onPointerDown } = usePointerReorder({
+  scroller: scroller,
+  container: scroller,
+  itemSelector: ".body .row",
+  onReorder: (from, to) => emit("reorder", from, to),
+});
+/** 仅歌单模式（draggable）启用；Ctrl/Shift 组合保留给多选，不进入拖拽 */
+function onRowPointerDown(index: number, e: PointerEvent) {
+  if (props.draggable) onPointerDown(index, e);
 }
 
 /* ---- 多选（M6）：单击选中，Ctrl+单击切换，Shift+单击范围选择；双击仍播放 ---- */
@@ -188,14 +184,10 @@ function onTagSaved(updated: Track) {
           over: overIndex === index && dragIndex !== index,
         }"
         :style="{ top: `${index * ROW_H}px`, height: `${ROW_H}px` }"
-        :draggable="draggable || undefined"
+        :data-index="index"
         @click="onRowClick(index, track, $event)"
         @dblclick="playRow(index)"
-        @dragstart="onDragStart(index)"
-        @dragover.prevent="onDragOver(index)"
-        @dragleave="overIndex = null"
-        @dragend="onDrop"
-        @drop.prevent="onDrop"
+        @pointerdown="onRowPointerDown(index, $event)"
       >
         <span class="col idx">
           <span v-if="isCurrent(track)" class="eq" :class="{ paused: !player.isPlaying }">
