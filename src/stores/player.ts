@@ -538,6 +538,14 @@ function removeFromQueue(index: number) {
   userQueue.value.splice(index, 1);
 }
 
+/** 双击待播曲目（M7+）：立即播放该曲；其之前的待播曲目一并出队，后续曲目按原顺序接续 */
+function playQueueAt(index: number) {
+  if (index < 0 || index >= userQueue.value.length) return;
+  const track = userQueue.value.splice(index, 1)[0];
+  userQueue.value.splice(0, index);
+  if (track) playTrack(track);
+}
+
 function clearUserQueue() {
   userQueue.value = [];
   // 清空 = 播完当前即停：截断上下文队列中当前曲目之后的部分，
@@ -917,6 +925,7 @@ export const usePlayerStore = defineStore("player", () => {
     playNext,
     addToQueue,
     removeFromQueue,
+    playQueueAt,
     clearUserQueue,
     reorderUserQueue,
     toggle,

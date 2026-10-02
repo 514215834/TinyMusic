@@ -5,6 +5,7 @@ import { usePlayerStore } from "../stores/player";
 import { useCovers } from "../composables/useCovers";
 import { usePointerReorder } from "../composables/usePointerReorder";
 import { formatTime } from "../utils";
+import type { Track } from "../services/library";
 import { t } from "../i18n";
 
 const player = usePlayerStore();
@@ -45,8 +46,12 @@ function onScroll(e: Event) {
   scrollTop.value = (e.target as HTMLElement).scrollTop;
 }
 
-/* 封面只解析可视窗口内的行 */
-const covers = useCovers(() => rows.value.map((r) => r.track));
+/* 封面只解析可视窗口内的行；正在播放行不在待播列表里，需一并纳入解析源 */
+const covers = useCovers(() =>
+  [player.currentTrack, ...rows.value.map((r) => r.track)].filter(
+    (t): t is Track => t != null,
+  ),
+);
 
 /* 拖拽重排（指针实现，Windows 下 HTML5 DnD 被 Tauri dragDropTarget 吞掉）：
    索引为 userQueue 绝对下标，虚拟行元素携带 data-index */
@@ -104,7 +109,7 @@ const { dragIndex, overIndex, onPointerDown } = usePointerReorder({
           :style="{ top: `${index * ROW_H}px`, height: `${ROW_H}px` }"
           :data-index="index"
           @pointerdown="onPointerDown(index, $event)"
-          @dblclick="player.removeFromQueue(index)"
+          @dblclick="player.playQueueAt(index)"
         >
           <span class="q-cover">
             <img v-if="covers[track.id]" :src="covers[track.id] ?? undefined" alt="" />
