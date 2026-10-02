@@ -4,6 +4,7 @@ import {
   type ArtistInfo,
   type BatchTagPatch,
   type BatchTagResult,
+  type DropImportResult,
   type Folder,
   type TagPatch,
   type Track,
@@ -12,7 +13,7 @@ import {
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { unwrap } from "./ipc";
 
-export type { AlbumInfo, ArtistInfo, BatchTagPatch, BatchTagResult, Folder, Track, TrackPage };
+export type { AlbumInfo, ArtistInfo, BatchTagPatch, BatchTagResult, DropImportResult, Folder, Track, TrackPage };
 
 /** 曲库相关命令封装（技术设计文档 §8：services 之外禁止直接 invoke） */
 export const libraryApi = {
@@ -44,6 +45,8 @@ export const libraryApi = {
   /** 批量标签编辑（M6）：留空字段不修改，trackNoStart 重编曲号；单首失败不中断 */
   tagUpdateBatch: async (trackIds: number[], patch: BatchTagPatch) =>
     unwrap(await commands.tagUpdateBatch(trackIds, patch)),
+  /** 拖拽导入（M7）：目录直接入库，音频文件取其所在目录；返回新增/跳过目录数 */
+  dropImport: async (paths: string[]) => unwrap(await commands.dropImport(paths)),
 };
 
 /** cover_file（缓存文件名）→ asset 协议 URL；无封面返回 null */

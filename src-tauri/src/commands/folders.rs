@@ -3,9 +3,11 @@ use std::path::{Path, PathBuf};
 use rusqlite::params;
 use tauri::{AppHandle, Manager, State};
 
+use crate::db;
 use crate::error::{AppError, AppErrorDto, AppResult};
 use crate::library;
-use crate::models::{Folder, Track};
+use crate::library::scanner::AUDIO_EXTS;
+use crate::models::{DropImportResult, Folder, Track};
 use crate::AppState;
 
 use super::tracks::{row_to_track, TRACK_SELECT};
@@ -54,6 +56,78 @@ pub async fn folder_add(
     let folder = add_folder(&app, &state, &path).map_err(AppErrorDto::from)?;
     library::spawn_scan(app);
     Ok(folder)
+}
+
+/// 候选目录是否已被某个根目录覆盖（相等或为其子目录）；比较用小写+反斜杠归一化（同 m3u8 路径匹配）
+fn is_covered(path: &str, roots: impl IntoIterator<Item = String>) -> bool {
+    let path = library::m3u8::normalize_path(path);
+    roots.into_iter().any(|root| {
+        let root = library::m3u8::normalize_path(&root);
+        path == root || path.starts_with(&format!("{root}\\"))
+    })
+}
+
+/// 拖拽导入（M7）：目录直接作为曲库来源；音频文件取其所在目录——曲库以目录为管理单元
+/// （tracks.folder_id 非空 + 增量监听按目录），单文件导入无法纳入监听与删除联动。
+/// 已被现有曲库目录或本次候选覆盖的范围跳过，避免重复扫描。
+#[tauri::command]
+#[specta::specta]
+pub async fn drop_import(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    paths: Vec<String>,
+) -> Result<DropImportResult, AppErrorDto> {
+    let mut skipped: u32 = 0;
+
+    // 目录本身 / 音频文件的父目录 → 候选；不支持的路径计数跳过
+    let mut candidates: Vec<PathBuf> = Vec::new();
+    for raw in paths {
+        let p = PathBuf::from(raw);
+        let candidate = if p.is_dir() {
+            Some(p)
+        } else if p.is_file()
+            && p.extension()
+                .is_some_and(|e| AUDIO_EXTS.contains(&e.to_string_lossy().to_lowercase().as_str()))
+        {
+            p.parent().map(Path::to_path_buf)
+        } else {
+            None
+        };
+        match candidate {
+            Some(c) => candidates.push(c),
+            None => skipped += 1,
+        }
+    }
+    // 父目录排前：嵌套候选先命中父级，子目录随后按覆盖检查跳过
+    candidates.sort();
+    candidates.dedup();
+
+    let mut roots: Vec<String> = {
+        let conn = state.conn.lock();
+        db::folder_rows(&conn)?.into_iter().map(|(_, path)| path).collect()
+    };
+
+    let mut added = 0u32;
+    for candidate in candidates {
+        let Ok(canonical) = candidate.canonicalize() else {
+            skipped += 1;
+            continue;
+        };
+        let path_str = normalize_path(&canonical);
+        if is_covered(&path_str, roots.iter().cloned()) {
+            skipped += 1;
+            continue;
+        }
+        add_folder(&app, &state, &path_str).map_err(AppErrorDto::from)?;
+        roots.push(path_str);
+        added += 1;
+    }
+
+    let result = DropImportResult { folders_added: added, folders_skipped: skipped };
+    if result.folders_added > 0 {
+        library::spawn_scan(app);
+    }
+    Ok(result)
 }
 
 fn list_folders(state: &AppState) -> AppResult<Vec<Folder>> {
@@ -123,12 +197,21 @@ pub async fn folder_tracks(
 mod tests {
     use std::path::PathBuf;
 
-    use super::normalize_path;
+    use super::{is_covered, normalize_path};
 
     #[test]
     fn 剥离扩展路径前缀() {
         assert_eq!(normalize_path(&PathBuf::from(r"\\?\G:\Music")), r"G:\Music");
         assert_eq!(normalize_path(&PathBuf::from(r"\\?\UNC\server\share")), r"\\server\share");
         assert_eq!(normalize_path(&PathBuf::from(r"G:\Music")), r"G:\Music");
+    }
+
+    #[test]
+    fn 覆盖检查忽略大小写且要求完整路径段() {
+        let roots = vec![r"G:\Music".to_string()];
+        assert!(is_covered(r"G:\Music", roots.clone()));
+        assert!(is_covered(r"g:\music\子目录\歌.flac", roots.clone()));
+        assert!(!is_covered(r"G:\MusicB", roots.clone()), "前缀相同但不是同一目录段");
+        assert!(!is_covered(r"G:\Other", roots));
     }
 }

@@ -69,7 +69,11 @@ fn on_menu(app: &AppHandle, id: &str) {
         "play_pause" => emit_action(app, "toggle"),
         "prev" => emit_action(app, "prev"),
         "next" => emit_action(app, "next"),
-        "quit" => app.exit(0),
+        "quit" => {
+            // 退出前保存主窗口状态（M7 窗口记忆；经托盘退出不触发 CloseRequested）
+            crate::window_state::save_now(app);
+            app.exit(0);
+        }
         _ => {}
     }
 }

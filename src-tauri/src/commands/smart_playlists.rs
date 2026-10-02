@@ -291,13 +291,15 @@ mod tests {
             "INSERT INTO folders(path) VALUES ('X');
              INSERT INTO artists(id, name) VALUES (1, 'Yuki');
              INSERT INTO albums(id, name, artist) VALUES (1, 'Best', 'Yuki');
+             -- 最近 N 天规则以 datetime('now') 为基准：种子日期用相对值，
+             -- 避免固定日期随真实时间流逝变成定时炸弹
              INSERT INTO tracks(id, path, folder_id, title, artist_id, album_id, genre, year, created_at) VALUES
-               (1, 'a.mp3', 1, 'A', 1, 1, 'J-Pop', 2023, '2026-09-01 00:00:00'),
-               (2, 'b.mp3', 1, 'B', 1, 1, 'Rock',  2020, '2026-09-20 00:00:00'),
+               (1, 'a.mp3', 1, 'A', 1, 1, 'J-Pop', 2023, datetime('now', '-10 days')),
+               (2, 'b.mp3', 1, 'B', 1, 1, 'Rock',  2020, datetime('now', '-20 days')),
                (3, 'c.mp3', 1, 'C', 1, 1, 'J-Pop', 1999, '2026-01-01 00:00:00'),
                (4, 'd.mp3', 1, 'D', 1, 1, NULL,    NULL, '2026-01-01 00:00:00');
              INSERT INTO play_history(track_id, played_at) VALUES
-               (1, '2026-09-30 10:00:00'), (1, '2026-10-01 09:00:00'),
+               (1, datetime('now', '-2 days')), (1, datetime('now', '-1 days')),
                (2, '2026-06-01 10:00:00');",
         )
         .unwrap();
@@ -351,10 +353,10 @@ mod tests {
             titles(&conn, &[rule(SmartField::Year, SmartOp::Gte, Some(2020.0), None)], None),
             vec!["A", "B"]
         );
-        // 最近 31 天添加：A（09-01，跨时区不越界）、B（09-20）
+        // 最近 31 天添加：A（10 天前）、B（20 天前）都命中
         let added = &[rule(SmartField::AddedAt, SmartOp::WithinDays, Some(31.0), None)];
         assert_eq!(titles(&conn, added, None), vec!["A", "B"]);
-        // 最近播放 30 天内：只有 A（B 上次播放是 6 月）
+        // 最近播放 30 天内：只有 A（B 上次播放是固定旧日期 6 月）
         let last = &[rule(SmartField::LastPlayed, SmartOp::WithinDays, Some(30.0), None)];
         assert_eq!(titles(&conn, last, None), vec!["A"]);
     }

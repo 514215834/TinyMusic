@@ -8,6 +8,13 @@ export const commands = {
 	albumsQuery: () => typedError<AlbumInfo[], AppErrorDto>(__TAURI_INVOKE("albums_query")),
 	artistTracks: (artistId: number) => typedError<Track[], AppErrorDto>(__TAURI_INVOKE("artist_tracks", { artistId })),
 	artistsQuery: () => typedError<ArtistInfo[], AppErrorDto>(__TAURI_INVOKE("artists_query")),
+	/**  导出全量备份到 JSON 文件，返回各部分计数（设置页展示用） */
+	backupExport: (path: string) => typedError<BackupExportResult, AppErrorDto>(__TAURI_INVOKE("backup_export", { path })),
+	/**
+	 *  从 JSON 文件恢复备份（合并语义），返回恢复报告；
+	 *  设置恢复后即时重注册各全局快捷键（覆盖"新环境恢复"场景，无需重启）
+	 */
+	backupRestore: (path: string) => typedError<BackupRestoreResult, AppErrorDto>(__TAURI_INVOKE("backup_restore", { path })),
 	coverPath: (file: string) => typedError<string | null, AppErrorDto>(__TAURI_INVOKE("cover_path", { file })),
 	/**  清理重复项：源文件移入回收站成功后删除曲库记录（级联清 歌单曲目/收藏/播放历史） */
 	duplicateResolve: (keepId: number, removeIds: number[]) => typedError<DuplicateResolve, AppErrorDto>(__TAURI_INVOKE("duplicate_resolve", { keepId, removeIds })),
@@ -16,6 +23,12 @@ export const commands = {
 	/**  收藏 id 集合（前端行内红心状态用，避免逐行查询） */
 	favoritesIds: () => typedError<number[], AppErrorDto>(__TAURI_INVOKE("favorites_ids")),
 	favoritesList: () => typedError<Track[], AppErrorDto>(__TAURI_INVOKE("favorites_list")),
+	/**
+	 *  拖拽导入（M7）：目录直接作为曲库来源；音频文件取其所在目录——曲库以目录为管理单元
+	 *  （tracks.folder_id 非空 + 增量监听按目录），单文件导入无法纳入监听与删除联动。
+	 *  已被现有曲库目录或本次候选覆盖的范围跳过，避免重复扫描。
+	 */
+	dropImport: (paths: string[]) => typedError<DropImportResult, AppErrorDto>(__TAURI_INVOKE("drop_import", { paths })),
 	folderAdd: (path: string) => typedError<Folder, AppErrorDto>(__TAURI_INVOKE("folder_add", { path })),
 	folderList: () => typedError<Folder[], AppErrorDto>(__TAURI_INVOKE("folder_list")),
 	folderRemove: (id: number) => typedError<boolean, AppErrorDto>(__TAURI_INVOKE("folder_remove", { id })),
@@ -68,6 +81,11 @@ export const commands = {
 	searchTracks: (q: string, page: number | null, pageSize: number | null) => typedError<TrackPage, AppErrorDto>(__TAURI_INVOKE("search_tracks", { q, page, pageSize })),
 	settingsGet: (key: string) => typedError<string | null, AppErrorDto>(__TAURI_INVOKE("settings_get", { key })),
 	settingsSet: (key: string, value: string) => typedError<null, AppErrorDto>(__TAURI_INVOKE("settings_set", { key, value })),
+	/**
+	 *  设置/清除播放控制类全局快捷键（M7，设置页调用）：
+	 *  shortcut 为 None 或空串 = 清除绑定；注册失败返回错误并保持旧键可用
+	 */
+	shortcutSet: (action: string, shortcut: string | null) => typedError<null, AppErrorDto>(__TAURI_INVOKE("shortcut_set", { action, shortcut })),
 	smartPlaylistCreate: (name: string, rules: SmartRule[], trackLimit: number | null) => typedError<SmartPlaylist, AppErrorDto>(__TAURI_INVOKE("smart_playlist_create", { name, rules, trackLimit })),
 	smartPlaylistDelete: (id: number) => typedError<null, AppErrorDto>(__TAURI_INVOKE("smart_playlist_delete", { id })),
 	smartPlaylistList: () => typedError<SmartPlaylist[], AppErrorDto>(__TAURI_INVOKE("smart_playlist_list")),
@@ -141,6 +159,29 @@ export type ArtistInfo = {
 	albumCount: number,
 };
 
+export type BackupExportResult = {
+	playlists: number,
+	tracks: number,
+	smartPlaylists: number,
+	favorites: number,
+	history: number,
+};
+
+/**  恢复报告：skipped 汇总所有按路径未命中曲库的引用（歌单曲目/收藏/历史） */
+export type BackupRestoreResult = {
+	playlistsCreated: number,
+	/**  同名歌单合并追加曲目的个数 */
+	playlistsMerged: number,
+	playlistTracksAdded: number,
+	smartPlaylistsCreated: number,
+	/**  同名已存在或规则非法而跳过的智能歌单个数 */
+	smartPlaylistsSkipped: number,
+	favoritesAdded: number,
+	historyAdded: number,
+	tracksSkipped: number,
+	settingsRestored: number,
+};
+
 /**
  *  批量标签编辑（M6）：None = 不修改该字段（区别于单曲编辑的 null=清除）；
  *  曲号重编 = track_no_start 起按传入顺序重编
@@ -157,6 +198,12 @@ export type BatchTagResult = {
 	updated: Track[],
 	failed: number,
 	firstError: string | null,
+};
+
+/**  拖拽导入（M7）：新增曲库目录数 / 跳过数（已被曲库目录覆盖或不支持的路径） */
+export type DropImportResult = {
+	foldersAdded: number,
+	foldersSkipped: number,
 };
 
 /**  重复曲目组（M6）：items 按添加时间升序，items[0] 为保留候选 */

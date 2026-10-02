@@ -6,7 +6,9 @@ pub mod models;
 pub mod overlay;
 #[cfg(windows)]
 pub mod smtc;
+pub mod shortcuts;
 pub mod tray;
+pub mod window_state;
 
 use std::path::PathBuf;
 

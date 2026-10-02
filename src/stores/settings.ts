@@ -70,6 +70,14 @@ export const useSettingsStore = defineStore("settings", {
   actions: {
     async load() {
       if (this.loaded) return;
+      await this.doLoad();
+    },
+    /** 备份恢复后强制重读并重新应用（load 的 loaded 守卫会跳过重复读取） */
+    async reload() {
+      this.loaded = false;
+      await this.doLoad();
+    },
+    async doLoad() {
       try {
         const raw = await settingsApi.get("appearance");
         if (raw) {

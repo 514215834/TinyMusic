@@ -1,8 +1,12 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
+import { open, save } from "@tauri-apps/plugin-dialog";
 import { useSettingsStore, type ThemeChoice } from "../stores/settings";
 import { usePlayerStore, EQ_FREQS, EQ_MIN, EQ_MAX } from "../stores/player";
 import { overlayApi } from "../services/overlay";
+import { settingsApi } from "../services/settings";
+import { backupApi } from "../services/backup";
+import { globalShortcutsApi, type ShortcutAction } from "../services/shortcuts";
 import type { Locale } from "../i18n";
 import { t } from "../i18n";
 
@@ -48,7 +52,7 @@ onMounted(async () => {
   void settings.load();
   void loadDevices();
   try {
-    const raw = await import("../services/settings").then((m) => m.settingsApi.get("overlay"));
+    const raw = await settingsApi.get("overlay");
     if (raw) {
       const parsed = JSON.parse(raw) as { opacity?: number; shortcut?: string };
       opacity.value = parsed.opacity ?? 0.6;
@@ -57,6 +61,7 @@ onMounted(async () => {
   } catch {
     opacity.value = 0.6;
   }
+  void loadGlobalShortcuts();
 });
 
 async function onOpacityChange() {
@@ -105,6 +110,106 @@ async function onDeviceChange(e: Event) {
 /** 频段刻度：≥1kHz 显示 kHz */
 function freqLabel(freq: number) {
   return freq >= 1000 ? `${freq / 1000}k` : `${freq}`;
+}
+
+/* ---- M7 全局快捷键（播放控制类） ---- */
+const GS_ROWS: { action: ShortcutAction; labelKey: string }[] = [
+  { action: "toggle", labelKey: "settings.gs.toggle" },
+  { action: "prev", labelKey: "settings.gs.prev" },
+  { action: "next", labelKey: "settings.gs.next" },
+  { action: "mini", labelKey: "settings.gs.mini" },
+];
+const gsValues = ref<Record<ShortcutAction, string>>({ toggle: "", prev: "", next: "", mini: "" });
+const gsErrors = ref<Partial<Record<ShortcutAction, string>>>({});
+
+async function loadGlobalShortcuts() {
+  try {
+    const raw = await settingsApi.get("shortcuts");
+    if (!raw) return;
+    const parsed = JSON.parse(raw) as Partial<Record<ShortcutAction, string>>;
+    for (const row of GS_ROWS) gsValues.value[row.action] = parsed[row.action] ?? "";
+  } catch {
+    /* 无配置 = 全部未绑定 */
+  }
+}
+
+async function onGsChange(action: ShortcutAction) {
+  const value = (gsValues.value[action] ?? "").trim();
+  try {
+    await globalShortcutsApi.set(action, value || null);
+    gsValues.value[action] = value;
+    gsErrors.value[action] = "";
+  } catch (e) {
+    gsErrors.value[action] = errorMessage(e);
+  }
+}
+
+/* ---- M7 数据备份 ---- */
+const backupBusy = ref(false);
+const backupNotice = ref("");
+const backupError = ref("");
+
+function errorMessage(e: unknown): string {
+  return e instanceof Error ? e.message : String(e);
+}
+
+function backupFileName() {
+  const d = new Date();
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `tinymusic-backup-${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}.json`;
+}
+
+async function onExportBackup() {
+  backupNotice.value = "";
+  backupError.value = "";
+  const path = await save({
+    defaultPath: backupFileName(),
+    filters: [{ name: "JSON", extensions: ["json"] }],
+  });
+  if (!path) return;
+  backupBusy.value = true;
+  try {
+    const r = await backupApi.export(path);
+    backupNotice.value = t("settings.backupExported", {
+      playlists: r.playlists,
+      tracks: r.tracks,
+      smarts: r.smartPlaylists,
+      favorites: r.favorites,
+      history: r.history,
+    });
+  } catch (e) {
+    backupError.value = errorMessage(e);
+  } finally {
+    backupBusy.value = false;
+  }
+}
+
+async function onRestoreBackup() {
+  backupNotice.value = "";
+  backupError.value = "";
+  const selected = await open({
+    multiple: false,
+    filters: [{ name: "JSON", extensions: ["json"] }],
+  });
+  if (typeof selected !== "string") return;
+  backupBusy.value = true;
+  try {
+    const r = await backupApi.restore(selected);
+    // 外观设置（主题/语言/主题色）即时重读生效；快捷键已由后端重注册
+    await settings.reload();
+    backupNotice.value = `${t("settings.backupRestored", {
+      created: r.playlistsCreated,
+      merged: r.playlistsMerged,
+      smarts: r.smartPlaylistsCreated,
+      favorites: r.favoritesAdded,
+      history: r.historyAdded,
+      skipped: r.tracksSkipped,
+    })} ${t("settings.backupRestoreDone")}`;
+  } catch (e) {
+    backupError.value = errorMessage(e);
+  } finally {
+    backupBusy.value = false;
+  }
 }
 </script>
 
@@ -254,10 +359,57 @@ function freqLabel(freq: number) {
     </div>
 
     <div class="group">
+      <div class="group-title dim">{{ t("settings.globalShortcuts") }}</div>
+      <template v-for="row in GS_ROWS" :key="row.action">
+        <div class="row">
+          <span>{{ t(row.labelKey) }}</span>
+          <input
+            v-model="gsValues[row.action]"
+            class="shortcut-input"
+            :placeholder="t('settings.gs.unset')"
+            spellcheck="false"
+            @change="onGsChange(row.action)"
+            @keyup.enter="($event.target as HTMLInputElement).blur()"
+          />
+        </div>
+        <div v-if="gsErrors[row.action]" class="row">
+          <span class="shortcut-err">{{ gsErrors[row.action] }}</span>
+        </div>
+      </template>
+      <div class="row">
+        <span class="notice">{{ t("settings.gsHint") }}</span>
+      </div>
+    </div>
+
+    <div class="group">
+      <div class="group-title dim">{{ t("settings.dataBackup") }}</div>
+      <div class="row">
+        <span class="notice">{{ t("settings.dataBackupDesc") }}</span>
+      </div>
+      <div class="row">
+        <span></span>
+        <div class="backup-actions">
+          <button class="backup-btn" :disabled="backupBusy" @click="onExportBackup">
+            {{ t("settings.exportBackup") }}
+          </button>
+          <button class="backup-btn" :disabled="backupBusy" @click="onRestoreBackup">
+            {{ t("settings.restoreBackup") }}
+          </button>
+        </div>
+      </div>
+      <div v-if="backupNotice" class="row">
+        <span class="notice backup-notice">{{ backupNotice }}</span>
+      </div>
+      <div v-if="backupError" class="row">
+        <span class="shortcut-err backup-notice">{{ backupError }}</span>
+      </div>
+    </div>
+
+    <div class="group">
       <div class="group-title dim">{{ t("settings.about") }}</div>
       <div class="row">
         <span>{{ t("settings.aboutDesc") }}</span>
-        <span class="dim">v0.7.0</span>
+        <span class="dim">v0.8.0</span>
       </div>
     </div>
   </section>
@@ -477,5 +629,34 @@ function freqLabel(freq: number) {
 .eq-sliders span {
   font-size: 10px;
   color: var(--text-dim);
+}
+
+.backup-actions {
+  display: inline-flex;
+  gap: 8px;
+}
+
+.backup-btn {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-elev);
+  color: var(--text);
+  font-size: 12px;
+  padding: 5px 12px;
+  cursor: pointer;
+}
+
+.backup-btn:hover:not(:disabled) {
+  background: var(--bg-hover);
+}
+
+.backup-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.backup-notice {
+  text-align: right;
+  word-break: break-all;
 }
 </style>

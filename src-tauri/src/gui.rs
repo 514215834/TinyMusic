@@ -13,12 +13,15 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
         crate::commands::albums::albums_query,
         crate::commands::albums::artist_tracks,
         crate::commands::albums::artists_query,
+        crate::commands::backup::backup_export,
+        crate::commands::backup::backup_restore,
         crate::commands::covers::cover_path,
         crate::commands::duplicates::duplicate_resolve,
         crate::commands::duplicates::duplicates_scan,
         crate::commands::favorites::favorite_toggle,
         crate::commands::favorites::favorites_ids,
         crate::commands::favorites::favorites_list,
+        crate::commands::folders::drop_import,
         crate::commands::folders::folder_add,
         crate::commands::folders::folder_list,
         crate::commands::folders::folder_remove,
@@ -50,6 +53,7 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
         crate::commands::search::search_tracks,
         crate::commands::settings::settings_get,
         crate::commands::settings::settings_set,
+        crate::commands::shortcuts::shortcut_set,
         crate::commands::smart_playlists::smart_playlist_create,
         crate::commands::smart_playlists::smart_playlist_delete,
         crate::commands::smart_playlists::smart_playlist_list,
@@ -120,6 +124,14 @@ pub fn run() {
             // 迷你播放器悬停检测/回锁 watcher + 可配置全局快捷键（§6.2，读 settings，需 AppState 就绪）
             crate::overlay::spawn_overlay_watcher(handle.clone());
             crate::overlay::register_shortcut_from_settings(&handle);
+            // 播放控制类全局快捷键（M7，默认全部未绑定）
+            crate::shortcuts::apply_all(&handle);
+
+            // 主窗口状态恢复（M7）：窗口在 conf 中默认隐藏，恢复尺寸位置后再显示，避免跳变
+            crate::window_state::restore(&handle);
+            if let Some(main) = app.get_webview_window("main") {
+                let _ = main.show();
+            }
 
             // SMTC 系统媒体浮层（媒体键经 smtc:command 回流，§2.3）
             #[cfg(windows)]
@@ -127,13 +139,15 @@ pub fn run() {
                 crate::smtc::init(&main, handle.clone());
             }
 
-            // 主窗口关闭 = 退出应用（迷你悬浮窗不拦截退出）
+            // 主窗口关闭 = 退出应用（迷你悬浮窗不拦截退出）；关闭前保存窗口状态（M7）
             let handle_for_exit = handle.clone();
             if let Some(main) = app.get_webview_window("main") {
-                main.on_window_event(move |event| {
-                    if let tauri::WindowEvent::Destroyed = event {
-                        handle_for_exit.exit(0);
+                main.on_window_event(move |event| match event {
+                    tauri::WindowEvent::CloseRequested { .. } => {
+                        crate::window_state::save_now(&handle_for_exit);
                     }
+                    tauri::WindowEvent::Destroyed => handle_for_exit.exit(0),
+                    _ => {}
                 });
             }
 

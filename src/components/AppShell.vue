@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { onMounted, ref } from "vue";
+import { onBeforeUnmount, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
+import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { open } from "@tauri-apps/plugin-dialog";
 import {
   CopyX,
@@ -20,6 +21,7 @@ import {
 } from "lucide-vue-next";
 import { playlistsApi, type Playlist } from "../services/playlists";
 import { smartApi, type SmartPlaylist } from "../services/smartPlaylists";
+import { libraryApi } from "../services/library";
 import { useKeyboardShortcuts } from "../composables/useKeyboardShortcuts";
 import { usePlayerStore } from "../stores/player";
 import { useSettingsStore } from "../stores/settings";
@@ -44,6 +46,48 @@ async function loadAll() {
   playlists.value = pls;
   smartPlaylists.value = smarts;
 }
+
+/* ---- M7 拖拽导入：目录/音频文件拖入主窗口 → 加入曲库并触发扫描 ---- */
+const dragActive = ref(false);
+const dropNotice = ref("");
+let dropNoticeTimer: ReturnType<typeof setTimeout> | null = null;
+let unlistenDragDrop: (() => void) | null = null;
+
+function showDropNotice(text: string) {
+  dropNotice.value = text;
+  if (dropNoticeTimer) clearTimeout(dropNoticeTimer);
+  dropNoticeTimer = setTimeout(() => (dropNotice.value = ""), 6000);
+}
+
+async function handleDrop(paths: string[]) {
+  if (!paths.length) return;
+  try {
+    const r = await libraryApi.dropImport(paths);
+    showDropNotice(r.foldersAdded > 0 ? t("drop.added", { n: r.foldersAdded }) : t("drop.none"));
+    // 新目录扫描完成经 scan:done 驱动各视图刷新，无需在此处理
+  } catch (e) {
+    showDropNotice(`${t("drop.failed")}: ${e instanceof Error ? e.message : String(e)}`);
+  }
+}
+
+onMounted(async () => {
+  unlistenDragDrop = await getCurrentWebview().onDragDropEvent((event) => {
+    const p = event.payload;
+    if (p.type === "enter" || p.type === "over") {
+      dragActive.value = true;
+    } else if (p.type === "drop") {
+      dragActive.value = false;
+      void handleDrop(p.paths);
+    } else {
+      dragActive.value = false;
+    }
+  });
+});
+
+onBeforeUnmount(() => {
+  unlistenDragDrop?.();
+  if (dropNoticeTimer) clearTimeout(dropNoticeTimer);
+});
 
 /** 智能歌单：+ 直接创建（默认规则=播放≥1次），跳转后规则可改 */
 async function createSmart() {
@@ -285,6 +329,15 @@ async function importPlaylist() {
 
     <Transition name="np">
       <NowPlaying v-if="player.nowPlayingOpen" />
+    </Transition>
+
+    <Transition name="np">
+      <div v-if="dragActive" class="drop-overlay">
+        <div class="drop-box">{{ t("drop.hint") }}</div>
+      </div>
+    </Transition>
+    <Transition name="np">
+      <div v-if="dropNotice" class="drop-notice">{{ dropNotice }}</div>
     </Transition>
   </div>
 </template>
@@ -556,5 +609,44 @@ async function importPlaylist() {
   display: flex;
   align-items: center;
   padding: 0 16px;
+}
+
+/* M7 拖拽导入：拖入时的全窗高亮遮罩（pointer-events 放行事件给系统 drop 处理） */
+.drop-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--bg) 72%, transparent);
+  pointer-events: none;
+}
+
+.drop-box {
+  border: 2px dashed var(--accent);
+  border-radius: 16px;
+  padding: 26px 44px;
+  color: var(--accent);
+  font-size: 15px;
+  font-weight: 600;
+  background: color-mix(in srgb, var(--bg-elev) 85%, transparent);
+}
+
+.drop-notice {
+  position: fixed;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 200;
+  max-width: 70%;
+  padding: 8px 16px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-elev);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16);
+  font-size: 12px;
+  word-break: break-all;
+  pointer-events: none;
 }
 </style>

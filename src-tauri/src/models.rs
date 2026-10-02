@@ -255,3 +255,11 @@ pub struct DuplicateResolve {
     pub failed: u32,
     pub first_error: Option<String>,
 }
+
+/// 拖拽导入（M7）：新增曲库目录数 / 跳过数（已被曲库目录覆盖或不支持的路径）
+#[derive(Debug, Clone, Serialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub struct DropImportResult {
+    pub folders_added: u32,
+    pub folders_skipped: u32,
+}

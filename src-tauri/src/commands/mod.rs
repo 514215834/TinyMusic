@@ -1,4 +1,5 @@
 pub mod albums;
+pub mod backup;
 pub mod covers;
 pub mod duplicates;
 pub mod favorites;
@@ -11,6 +12,7 @@ pub mod playlists;
 pub mod scrape;
 pub mod search;
 pub mod settings;
+pub mod shortcuts;
 pub mod smart_playlists;
 pub mod smtc;
 pub mod stats;

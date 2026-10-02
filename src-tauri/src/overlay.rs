@@ -187,8 +187,9 @@ fn apply_rounded_corners(window: &tauri::WebviewWindow) {
 
 /// 恢复持久化位置后夹取到当前显示器可见范围（含 16px 逻辑边距）：
 /// 窗口尺寸变更或显示器变更后，旧坐标可能把窗口推出屏幕边缘
-/// （例：加宽 10% 后沿用旧 x = 右边贴边/出屏）
-fn clamp_into_monitor(window: &tauri::WebviewWindow) {
+/// （例：加宽 10% 后沿用旧 x = 右边贴边/出屏）。
+/// 迷你窗与主窗口状态恢复（M7 window_state）共用。
+pub(crate) fn clamp_into_monitor(window: &tauri::WebviewWindow) {
     let (Ok(pos), Ok(size)) = (window.outer_position(), window.outer_size()) else {
         return;
     };
@@ -384,6 +385,15 @@ pub fn set_shortcut(app: &AppHandle, shortcut: &str) -> crate::error::AppResult<
     if REGISTERED_SHORTCUT.lock().as_deref().is_some_and(|c| c.eq_ignore_ascii_case(s)) {
         return Ok(());
     }
+    // 本应用其他功能（播放控制快捷键 M7）已占用同一组合时直接拒绝，
+    // 避免 on_shortcut 对已注册键叠加处理器导致双触发
+    if let Ok(parsed) = s.parse::<Shortcut>() {
+        if app.global_shortcut().is_registered(parsed) {
+            return Err(AppError::Message(format!(
+                "快捷键「{s}」已被占用（可能已绑定本应用其他功能）"
+            )));
+        }
+    }
 
     let gs = app.global_shortcut();
     let old = REGISTERED_SHORTCUT.lock().clone();
@@ -400,4 +410,19 @@ pub fn set_shortcut(app: &AppHandle, shortcut: &str) -> crate::error::AppResult<
         save_settings(&state, &settings);
     }
     Ok(())
+}
+
+/// 备份恢复后按持久化配置重注册快捷键（M7）：配置未变时幂等，失败仅告警
+pub fn reapply_shortcut(app: &AppHandle) {
+    let configured = {
+        let state = app.state::<AppState>();
+        load_settings(&state).shortcut
+    };
+    let Some(s) = configured else { return };
+    if REGISTERED_SHORTCUT.lock().as_deref().is_some_and(|c| c.eq_ignore_ascii_case(&s)) {
+        return;
+    }
+    if let Err(e) = set_shortcut(app, &s) {
+        eprintln!("[shortcut] 迷你窗快捷键「{s}」重注册失败: {e}");
+    }
 }
