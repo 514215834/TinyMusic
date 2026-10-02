@@ -112,6 +112,11 @@ function freqLabel(freq: number) {
   return freq >= 1000 ? `${freq / 1000}k` : `${freq}`;
 }
 
+/** crossfade 滑杆标签：0 = 关闭 */
+const crossfadeLabel = computed(() =>
+  player.crossfadeSec > 0 ? `${player.crossfadeSec}s` : t("settings.crossfadeOff"),
+);
+
 /* ---- M7 全局快捷键（播放控制类） ---- */
 const GS_ROWS: { action: ShortcutAction; labelKey: string }[] = [
   { action: "toggle", labelKey: "settings.gs.toggle" },
@@ -311,6 +316,40 @@ async function onRestoreBackup() {
     </div>
 
     <div class="group">
+      <div class="group-title dim">{{ t("settings.playback") }}</div>
+      <div class="row">
+        <span>{{ t("settings.gapless") }}</span>
+        <div class="segment">
+          <button :class="{ active: player.gapless }" @click="player.setGapless(true)">
+            {{ t("common.on") }}
+          </button>
+          <button :class="{ active: !player.gapless }" @click="player.setGapless(false)">
+            {{ t("common.off") }}
+          </button>
+        </div>
+      </div>
+      <div class="row">
+        <span>{{ t("settings.crossfade") }}</span>
+        <div class="opacity-row">
+          <input
+            :value="player.crossfadeSec"
+            type="range"
+            min="0"
+            max="6"
+            step="0.5"
+            @change="
+              player.setCrossfade(Number(($event.target as HTMLInputElement).value))
+            "
+          />
+          <span class="dim">{{ crossfadeLabel }}</span>
+        </div>
+      </div>
+      <div class="row">
+        <span class="notice">{{ t("settings.playbackHint") }}</span>
+      </div>
+    </div>
+
+    <div class="group">
       <div class="group-title dim">{{ t("settings.audio") }}</div>
       <div class="row">
         <span>{{ t("settings.outputDevice") }}</span>
@@ -409,7 +448,7 @@ async function onRestoreBackup() {
       <div class="group-title dim">{{ t("settings.about") }}</div>
       <div class="row">
         <span>{{ t("settings.aboutDesc") }}</span>
-        <span class="dim">v0.8.0</span>
+        <span class="dim">v0.9.0</span>
       </div>
     </div>
   </section>
