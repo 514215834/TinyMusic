@@ -16,6 +16,8 @@ export const playlistsApi = {
     unwrap(await commands.playlistRemoveTrack(id, trackId)),
   reorder: async (id: number, trackIds: number[]) =>
     unwrap(await commands.playlistReorder(id, trackIds)),
+  /** 侧边栏歌单拖拽重排（全量提交顺序） */
+  reorderPlaylists: async (ids: number[]) => unwrap(await commands.playlistReorderPlaylists(ids)),
   /** 导出为 UTF-8 M3U8 文件（绝对路径），返回写入曲目数 */
   exportM3u8: async (id: number, path: string) => unwrap(await commands.playlistExport(id, path)),
   /** 从 M3U8 导入为新歌单，返回 新歌单id/导入数/跳过数 */

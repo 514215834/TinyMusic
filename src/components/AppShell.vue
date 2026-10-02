@@ -139,6 +139,36 @@ async function remove(p: Playlist) {
   await loadAll();
 }
 
+/* ---- 歌单侧边栏拖拽重排（HTML5 DnD，模式同 QueuePanel） ---- */
+const plDragIndex = ref<number | null>(null);
+const plOverIndex = ref<number | null>(null);
+
+function onPlDragStart(index: number) {
+  plDragIndex.value = index;
+}
+
+function onPlDragOver(index: number) {
+  plOverIndex.value = index;
+}
+
+async function onPlDrop() {
+  const from = plDragIndex.value;
+  const to = plOverIndex.value;
+  plDragIndex.value = null;
+  plOverIndex.value = null;
+  if (from == null || to == null || from === to) return;
+  const next = [...playlists.value];
+  const [moved] = next.splice(from, 1);
+  if (!moved) return;
+  next.splice(to, 0, moved);
+  playlists.value = next; // 乐观更新，落库失败回滚为服务端顺序
+  try {
+    await playlistsApi.reorderPlaylists(next.map((p) => p.id));
+  } catch {
+    await loadAll();
+  }
+}
+
 async function removeSmart(s: SmartPlaylist) {
   await smartApi.remove(s.id);
   await loadAll();
@@ -239,11 +269,21 @@ async function importPlaylist() {
 
       <nav class="pl-list">
         <RouterLink
-          v-for="p in playlists"
+          v-for="(p, index) in playlists"
           :key="p.id"
           class="pl-item"
+          :class="{
+            'pl-dragging': plDragIndex === index,
+            'pl-over': plOverIndex === index && plDragIndex !== index,
+          }"
           :to="{ name: 'playlist', params: { id: p.id } }"
           :title="p.name"
+          :draggable="renamingId !== p.id"
+          @dragstart="onPlDragStart(index)"
+          @dragover.prevent="onPlDragOver(index)"
+          @dragleave="plOverIndex = null"
+          @dragend="onPlDrop"
+          @drop.prevent="onPlDrop"
         >
           <ListMusic :size="14" />
           <template v-if="renamingId === p.id">
@@ -475,6 +515,14 @@ async function importPlaylist() {
 .pl-item.router-link-active {
   background: var(--bg-hover);
   font-weight: 600;
+}
+
+.pl-item.pl-dragging {
+  opacity: 0.4;
+}
+
+.pl-item.pl-over {
+  box-shadow: inset 0 2px 0 var(--accent);
 }
 
 .pl-name {

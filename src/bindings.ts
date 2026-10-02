@@ -56,6 +56,7 @@ export const commands = {
 	playlistRemoveTrack: (id: number, trackId: number) => typedError<number, AppErrorDto>(__TAURI_INVOKE("playlist_remove_track", { id, trackId })),
 	playlistRename: (id: number, name: string) => typedError<null, AppErrorDto>(__TAURI_INVOKE("playlist_rename", { id, name })),
 	playlistReorder: (id: number, trackIds: number[]) => typedError<number, AppErrorDto>(__TAURI_INVOKE("playlist_reorder", { id, trackIds })),
+	playlistReorderPlaylists: (ids: number[]) => typedError<null, AppErrorDto>(__TAURI_INVOKE("playlist_reorder_playlists", { ids })),
 	playlistTracks: (id: number) => typedError<Track[], AppErrorDto>(__TAURI_INVOKE("playlist_tracks", { id })),
 	scrapeAlbum: (albumId: number, source: 
 /**  iTunes Search（JP 店面优先，US 兜底）：封面/专辑信息 */

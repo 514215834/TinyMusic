@@ -43,6 +43,7 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
         crate::commands::playlists::playlist_remove_track,
         crate::commands::playlists::playlist_rename,
         crate::commands::playlists::playlist_reorder,
+        crate::commands::playlists::playlist_reorder_playlists,
         crate::commands::playlists::playlist_tracks,
         crate::commands::scrape::scrape_album,
         crate::commands::scrape::scrape_apply_album,

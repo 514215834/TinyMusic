@@ -9,6 +9,7 @@ const MIGRATIONS: &[&str] = &[
     include_str!("../../migrations/0003_backfill_fts.sql"),
     include_str!("../../migrations/0004_lyrics.sql"),
     include_str!("../../migrations/0005_m4.sql"),
+    include_str!("../../migrations/0006_playlist_sort.sql"),
 ];
 
 pub fn run(conn: &Connection) -> AppResult<()> {

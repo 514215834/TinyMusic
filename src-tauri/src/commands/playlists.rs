@@ -32,7 +32,7 @@ fn list(state: &AppState) -> AppResult<Vec<Playlist>> {
         "SELECT p.id, p.name, \
             (SELECT COUNT(*) FROM playlist_tracks pt WHERE pt.playlist_id = p.id), \
             p.created_at \
-         FROM playlists p ORDER BY p.id",
+         FROM playlists p ORDER BY p.position, p.id",
     )?;
     let rows = stmt.query_map([], playlist_row)?;
     Ok(rows.collect::<Result<Vec<_>, _>>()?)
@@ -91,6 +91,29 @@ fn delete(state: &AppState, id: i32) -> AppResult<()> {
     let conn = state.conn.lock();
     conn.execute("DELETE FROM playlists WHERE id = ?1", params![i64::from(id)])?;
     Ok(())
+}
+
+/// 侧边栏歌单拖拽重排（M7+）：按传入顺序写 position（全量提交，单事务）
+fn reorder_playlists(state: &AppState, ids: &[i32]) -> AppResult<()> {
+    let mut conn = state.conn.lock();
+    let tx = conn.transaction()?;
+    for (idx, id) in ids.iter().enumerate() {
+        tx.execute(
+            "UPDATE playlists SET position = ?1 WHERE id = ?2",
+            params![idx as i64, i64::from(*id)],
+        )?;
+    }
+    tx.commit()?;
+    Ok(())
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn playlist_reorder_playlists(
+    state: State<'_, AppState>,
+    ids: Vec<i32>,
+) -> Result<(), AppErrorDto> {
+    reorder_playlists(&state, &ids).map_err(AppErrorDto::from)
 }
 
 #[tauri::command]
