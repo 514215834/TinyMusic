@@ -70,7 +70,9 @@ function toggleOverlay() {
 </script>
 
 <template>
-  <div class="player-bar">
+  <!-- 根类名不能用 .player-bar：与 AppShell 壃 footer.player-bar 撞名，
+       scoped 下会命中父组件样式导致 display:grid 被 flex 覆盖（按钮随歌名位移的根因） -->
+  <div class="pbar">
     <div class="now">
       <img
         v-if="coverUrl"
@@ -172,11 +174,13 @@ function toggleOverlay() {
 </template>
 
 <style scoped>
-.player-bar {
+/* 四列网格：两侧（播放控制 / 右侧操作）auto 定宽 → 按钮位置不随歌名长度变动；
+   标题列与进度列分吃剩余空间，歌名超长由 .title/.artist 的 ellipsis 隐藏 */
+.pbar {
   height: 100%;
   width: 100%;
   display: grid;
-  grid-template-columns: minmax(140px, 1fr) auto minmax(160px, 2fr) minmax(0, 1.1fr);
+  grid-template-columns: minmax(120px, 1fr) auto minmax(160px, 2fr) auto;
   gap: 16px;
   align-items: center;
   padding: 0 16px;
