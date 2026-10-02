@@ -641,7 +641,8 @@ async function importPlaylist() {
   height: 72px;
   z-index: 90;
   border-top: 1px solid var(--border);
-  background: color-mix(in srgb, var(--bg-elev) 62%, transparent);
+  /* 86% = 修复类名撞车前的"双层毛玻璃"叠加有效不透明度 1-(1-0.62)²，单层需补足 */
+  background: color-mix(in srgb, var(--bg-elev) 86%, transparent);
   backdrop-filter: blur(28px) saturate(1.4);
   -webkit-backdrop-filter: blur(28px) saturate(1.4);
   display: flex;
